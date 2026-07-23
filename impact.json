@@ -6,6 +6,13 @@
       "repo": "immich-app/immich",
       "repoLabel": "immich · 108k★",
       "pr": 30163
+    },
+    {
+      "title": "sync-agent findOne N+1",
+      "type": "N+1 (for 루프 안 findOne, 소스 통합당 쿼리 1회)",
+      "repo": "novuhq/novu",
+      "repoLabel": "novu · 40k★",
+      "pr": 12074
     }
   ]
 }
