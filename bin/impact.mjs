@@ -76,8 +76,9 @@ const md = `# cleanscore — 실전 성과 (impact log)
 cleanscore가 **실제 오픈소스에서 찾아낸 이슈**와 그 결과. 점수판이 아니라 **증거**다 —
 "청결점수"가 등급만 매기는 게 아니라, 진짜 고칠 것을 파일:줄 단위로 짚는다는 증명.
 
-> **임팩트 점수: ${score}**
+> **cleanscore 임팩트 점수: ${score}**
 > 머지된 PR 1개 = **+1점**. (draft·open = 0, 닫힘 = 0)
+> _(cleanscore가 실제로 고쳐 머지된 것의 누적 — 대상 repo의 청결점수와는 별개 지표.)_
 >
 > _(자동 생성 — \`node bin/impact.mjs\`. GitHub PR 상태 기준.)_
 
@@ -108,9 +109,9 @@ console.log("  ✓ IMPACT.md 갱신됨");
 const featured = rows[0];
 const fL = featured ? (LABEL[featured.status] || LABEL.unknown) : null;
 const featuredStatus = featured
-  ? (featured.status === "merged" ? `${fL.icon} merged · +1`
+  ? (featured.status === "merged" ? `${fL.icon} merged · 임팩트 +1`
     : featured.status === "closed" ? `${fL.icon} closed`
-    : `${fL.icon} ${fL.ko} · 머지되면 +1`)
+    : `${fL.icon} ${fL.ko} · 머지되면 임팩트 +1`)
   : null;
 for (const file of ["landing.html", "index.html"]) {
   const p = path.join(ROOT, file);
