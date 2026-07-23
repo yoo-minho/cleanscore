@@ -1,12 +1,25 @@
 {
   "name": "cleanscore",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "3분 만에 코드베이스 청결점수 — 정적 분석, 100% 로컬, A+~D 등급. 게임 불가.",
   "type": "module",
-  "bin": { "cleanscore": "bin/cleanscore.mjs" },
-  "files": ["bin"],
-  "keywords": ["code-quality", "static-analysis", "cognitive-complexity", "duplication", "dead-code", "cli"],
-  "engines": { "node": ">=20" },
+  "bin": {
+    "cleanscore": "bin/cleanscore.mjs"
+  },
+  "files": [
+    "bin"
+  ],
+  "keywords": [
+    "code-quality",
+    "static-analysis",
+    "cognitive-complexity",
+    "duplication",
+    "dead-code",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "knip": "^6.29.0",
     "typescript": "^5.4.0"

@@ -244,12 +244,18 @@ function analyzeQuality(content) {
 
 // 프로젝트의 typescript 패키지 로드 (AST 기반 정밀 분석용)
 function loadTypescript() {
+  // 1) 타겟 프로젝트의 typescript (있으면 그 버전 사용)
   try {
-    const require = createRequire(path.resolve(process.cwd(), "package.json"));
-    return require("typescript");
-  } catch {
-    return null;
-  }
+    const req = createRequire(path.resolve(process.cwd(), "package.json"));
+    return req("typescript");
+  } catch {}
+  // 2) cleanscore 자신에 번들된 typescript (하드 의존 → npx 설치 시 항상 존재).
+  //    이게 없으면 타겟에 typescript 없을 때 조용히 regex 폴백으로 떨어져 점수가 달라진다(배지 비교 불가).
+  try {
+    const req = createRequire(import.meta.url);
+    return req("typescript");
+  } catch {}
+  return null;
 }
 
 // AST 기반 함수별 복잡도 — cyclomatic(McCabe) + cognitive(SonarQube 근사)
