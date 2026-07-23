@@ -189,6 +189,27 @@
   .card p { margin: 8px 0 0; font-size: 13.5px; color: var(--ink-soft); }
   .card .fig { font-family: var(--mono); font-weight: 700; font-size: 22px; margin-top: 12px; letter-spacing: -0.01em; }
 
+  /* ── impact ── */
+  .impact-top { display: flex; align-items: baseline; gap: 16px; margin-bottom: 14px; font-family: var(--mono); }
+  .impact-score { font-size: 15px; color: var(--ink); }
+  .impact-score b { color: var(--accent); font-size: 20px; }
+  .impact-rule { font-size: 12px; color: var(--ink-soft); letter-spacing: .04em; }
+  .find { display: flex; gap: 18px; align-items: center; justify-content: space-between;
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 20px;
+    box-shadow: var(--shadow); text-decoration: none; color: inherit; transition: border-color .15s; }
+  .find:hover { border-color: var(--accent); text-decoration: none; }
+  .find-title { font-family: var(--mono); font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 9px; }
+  .nplus { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--gD); border: 1.5px solid var(--gD); border-radius: 5px; padding: 1px 6px; letter-spacing: .02em; }
+  .find-repo { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); margin-top: 5px; }
+  .find-desc { font-size: 13px; color: var(--ink-soft); margin-top: 8px; max-width: 60ch; line-height: 1.55; }
+  .find-desc code { font-family: var(--mono); background: var(--rule-soft); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .find-r { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; flex-shrink: 0; }
+  .find-pr { font-family: var(--mono); font-weight: 700; font-size: 14px; color: var(--accent-ink); }
+  .find-status { font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft); white-space: nowrap; }
+  .impact-note { margin-top: 16px; font-size: 13.5px; color: var(--ink-soft); border-left: 2px solid var(--accent); padding: 4px 0 4px 14px; line-height: 1.6; }
+  .impact-note b { color: var(--ink); }
+  @media (max-width: 620px) { .find { flex-direction: column; align-items: flex-start; } .find-r { align-items: flex-start; } }
+
   /* ── start ── */
   .steps { display: grid; gap: 12px; }
   .step { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; }
@@ -315,6 +336,32 @@
   <section>
     <div class="sec-head">
       <span class="num">04</span>
+      <h2>실전 성과</h2>
+      <span class="note">등급이 아니라 증거</span>
+    </div>
+    <div class="impact">
+      <div class="impact-top">
+        <span class="impact-score">임팩트 점수 <b>0</b></span>
+        <span class="impact-rule">머지된 PR 1건 = +1</span>
+      </div>
+      <a class="find" href="https://github.com/immich-app/immich/pull/30163" target="_blank" rel="noopener">
+        <div class="find-l">
+          <div class="find-title">deleteBulkMetadata <span class="nplus">N+1</span></div>
+          <div class="find-repo">immich · ★ 108k · NestJS 서버</div>
+          <div class="find-desc">루프 안에서 item당 <code>DELETE</code> 1방씩 = N번 왕복. cleanscore의 io축(순차 await)이 감지 → 사람이 검증 → 배칭 PR.</div>
+        </div>
+        <div class="find-r">
+          <span class="find-pr">PR #30163</span>
+          <span class="find-status">🟡 draft · 머지되면 +1</span>
+        </div>
+      </a>
+      <p class="impact-note">리더보드는 <b>의견</b>이지만, 머지된 PR은 <b>반박 불가 사실</b>이다. cleanscore는 등급만 매기지 않고 고칠 것을 파일·줄 단위로 짚는다.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">05</span>
       <h2>시작하기</h2>
     </div>
     <div class="steps">
