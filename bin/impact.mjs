@@ -104,14 +104,23 @@ npx cleanscore --dir=src --dead
 fs.writeFileSync(path.join(ROOT, "IMPACT.md"), md);
 console.log("  ✓ IMPACT.md 갱신됨");
 
-// 랜딩 임팩트 점수도 동기화 (landing.html / index.html)
+// 랜딩 동기화 (landing.html / index.html): 임팩트 점수 + featured PR 상태 배지
+const featured = rows[0];
+const fL = featured ? (LABEL[featured.status] || LABEL.unknown) : null;
+const featuredStatus = featured
+  ? (featured.status === "merged" ? `${fL.icon} merged · +1`
+    : featured.status === "closed" ? `${fL.icon} closed`
+    : `${fL.icon} ${fL.ko} · 머지되면 +1`)
+  : null;
 for (const file of ["landing.html", "index.html"]) {
   const p = path.join(ROOT, file);
   if (!fs.existsSync(p)) continue;
   let s = fs.readFileSync(p, "utf-8");
-  const next = s.replace(/(임팩트 점수 <b>)\d+(<\/b>)/, `$1${score}$2`);
-  if (next !== s) {
-    fs.writeFileSync(p, next);
-    console.log(`  ✓ ${file} 임팩트 점수 → ${score}`);
+  const before = s;
+  s = s.replace(/(임팩트 점수 <b>)\d+(<\/b>)/, `$1${score}$2`);
+  if (featuredStatus) s = s.replace(/(<span class="find-status">)[^<]*(<\/span>)/, `$1${featuredStatus}$2`);
+  if (s !== before) {
+    fs.writeFileSync(p, s);
+    console.log(`  ✓ ${file} 동기화 (점수 ${score}, 상태 ${featured?.status ?? "-"})`);
   }
 }
