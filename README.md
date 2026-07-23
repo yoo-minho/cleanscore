@@ -65,7 +65,20 @@ npx cleanscore --dir=src
 
 # 데드코드 축 추가 (knip 내장, 프로젝트 전체 1회 훑음)
 npx cleanscore --dir=src --dead
+
+# README 배지 생성 (SVG + 붙이는 마크다운 스니펫)
+npx cleanscore --dir=src --badge
 ```
+
+### README에 붙이기
+
+`--badge`는 `cleanscore.svg`를 생성한다. 커버리지 배지처럼 README에 박으면 된다:
+
+```md
+![clean score](./cleanscore.svg)
+```
+
+`clean score | A+ · 100` — 등급 색으로 렌더된다 (A+/A 초록, B 골드, C 주황, D 빨강).
 
 결과는 `--out` 디렉토리에 `kit-stats.json`으로도 떨어진다 (CI 추이 추적용).
 

@@ -25,6 +25,35 @@ const getFlag = (name) => {
 const srcDir = path.resolve(process.cwd(), getFlag("dir") || "src");
 const outDir = path.resolve(process.cwd(), getFlag("out") || "public");
 const wantDead = args.includes("--dead"); // 데드코드축(knip) 옵트인 — 느리므로 기본 off
+const wantBadge = args.includes("--badge"); // README·사이트 임베드용 SVG 배지 생성
+
+// 등급 색 (라이트 기준) — 배지·임베드 공용
+const GRADE_COLORS = { "A+": "#12915a", A: "#12915a", B: "#b6841a", C: "#d4701a", D: "#cb4436" };
+
+// shields 스타일 SVG 배지 생성 — "clean score | A · 90"
+function makeBadgeSvg(grade, score) {
+  const left = "clean score";
+  const right = `${grade} · ${score}`;
+  const color = GRADE_COLORS[grade] || "#888";
+  const cw = 6.6; // 대략적 글자 폭(px, 11pt)
+  const lw = Math.round(left.length * cw) + 16;
+  const rw = Math.round(right.length * cw) + 18;
+  const w = lw + rw;
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="20" role="img" aria-label="${esc(left)}: ${esc(right)}">
+  <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
+  <clipPath id="r"><rect width="${w}" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="${lw}" height="20" fill="#3b3b40"/>
+    <rect x="${lw}" width="${rw}" height="20" fill="${color}"/>
+    <rect width="${w}" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11">
+    <text x="${lw / 2}" y="14">${esc(left)}</text>
+    <text x="${lw + rw / 2}" y="14" font-weight="bold">${esc(right)}</text>
+  </g>
+</svg>`;
+}
 
 // kit의 meta.json에서 실제 측정된 LOC 로드
 let KIT_FEATURES = {};
@@ -1084,6 +1113,15 @@ const stats = {
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 const outPath = path.join(outDir, "kit-stats.json");
 fs.writeFileSync(outPath, JSON.stringify(stats, null, 2));
+
+// --badge: README·사이트에 붙일 SVG 배지 + 마크다운 스니펫
+if (wantBadge) {
+  const badgePath = path.join(outDir, "cleanscore.svg");
+  fs.writeFileSync(badgePath, makeBadgeSvg(qualityGrade, qualityScore));
+  const rel = path.relative(process.cwd(), badgePath);
+  console.log(`\n  🏷  배지 생성: ${rel}`);
+  console.log(`     README에 붙이기:  ![clean score](${rel})`);
+}
 
 console.log(`  파일: ${files.length}개`);
 console.log(`  코드: ${codeLines.toLocaleString()}줄 (전체 ${totalLines.toLocaleString()}줄)`);
