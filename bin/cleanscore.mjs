@@ -101,7 +101,7 @@ if (metaPath) {
 }
 
 // 소스 파일 수집
-function collectFiles(dir, exts = [".ts", ".tsx", ".js", ".jsx"]) {
+function collectFiles(dir, exts = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]) {
   const results = [];
   if (!fs.existsSync(dir)) return results;
 

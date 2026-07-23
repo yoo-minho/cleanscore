@@ -1,5 +1,9 @@
 # cleanscore
 
+![clean score](./cleanscore.svg)
+
+> 네, 우리도 **D**입니다. 엔진이 1,100줄짜리 단일 파일이라서요. 툴은 자기한테도 안 봐줍니다 — 그게 요점입니다. ([랜딩](https://yoo-minho.github.io/cleanscore))
+
 **3분 만에 코드베이스를 채점한다.** 정적 분석 · 100% 로컬 · LLM 0 · A+ ~ D 등급.
 
 ```bash
