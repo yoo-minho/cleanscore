@@ -1,0 +1,332 @@
+<title>청결점수 · CLEAN SCORE</title>
+<style>
+  :root {
+    --paper: #f4f5f8;
+    --panel: #ffffff;
+    --ink: #14161c;
+    --ink-soft: #565b66;
+    --rule: #d7dbe2;
+    --rule-soft: #e6e9ef;
+    --accent: #4148d8;
+    --accent-ink: #3037c4;
+    --gA: #12915a;   /* A+ / A */
+    --gB: #1f7e86;   /* B */
+    --gC: #b6791a;   /* C */
+    --gD: #cb4436;   /* D */
+    --shadow: 0 1px 0 var(--rule), 0 18px 40px -30px rgba(20,22,28,.5);
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0e1014;
+      --panel: #15181e;
+      --ink: #e8eaf0;
+      --ink-soft: #9aa1ad;
+      --rule: #272c35;
+      --rule-soft: #1d222a;
+      --accent: #7b82ff;
+      --accent-ink: #9aa0ff;
+      --gA: #35c98a;
+      --gB: #3ab3bd;
+      --gC: #d69a34;
+      --gD: #ec6152;
+      --shadow: 0 1px 0 var(--rule), 0 24px 50px -34px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #f4f5f8; --panel: #ffffff; --ink: #14161c; --ink-soft: #565b66;
+    --rule: #d7dbe2; --rule-soft: #e6e9ef; --accent: #4148d8; --accent-ink: #3037c4;
+    --gA: #12915a; --gB: #1f7e86; --gC: #b6791a; --gD: #cb4436;
+    --shadow: 0 1px 0 var(--rule), 0 18px 40px -30px rgba(20,22,28,.5);
+  }
+  :root[data-theme="dark"] {
+    --paper: #0e1014; --panel: #15181e; --ink: #e8eaf0; --ink-soft: #9aa1ad;
+    --rule: #272c35; --rule-soft: #1d222a; --accent: #7b82ff; --accent-ink: #9aa0ff;
+    --gA: #35c98a; --gB: #3ab3bd; --gC: #d69a34; --gD: #ec6152;
+    --shadow: 0 1px 0 var(--rule), 0 24px 50px -34px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+  a { color: var(--accent-ink); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+
+  .mono { font-family: var(--mono); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--ink-soft);
+  }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ── top rule / masthead ── */
+  header.mast {
+    border-bottom: 1px solid var(--rule);
+    background: var(--panel);
+  }
+  .mast-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 0; gap: 16px;
+  }
+  .brand { font-family: var(--mono); font-weight: 700; letter-spacing: .04em; font-size: 15px; }
+  .brand .sp { color: var(--accent); }
+  .mast-meta { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); letter-spacing: .04em; }
+
+  /* ── hero ── */
+  .hero { padding: 68px 0 40px; }
+  .hero h1 {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: clamp(30px, 5.4vw, 50px);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 18px 0 0;
+  }
+  .hero .lede {
+    max-width: 54ch; margin: 20px 0 0; font-size: 17px; color: var(--ink-soft);
+  }
+  .hero .lede b { color: var(--ink); font-weight: 600; }
+
+  .cmd {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin-top: 30px;
+    font-family: var(--mono); font-size: 15px;
+    background: var(--panel); border: 1px solid var(--rule);
+    border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow);
+  }
+  .cmd .dollar { color: var(--accent); font-weight: 700; }
+  .cmd code { color: var(--ink); }
+  .cmd .flag { color: var(--ink-soft); }
+  .cmd .tag {
+    margin-left: auto; font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-soft); border: 1px solid var(--rule); border-radius: 999px; padding: 3px 9px;
+  }
+
+  /* ── graded readout card ── */
+  .readout {
+    margin-top: 22px;
+    display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: center;
+    background: var(--panel); border: 1px solid var(--rule);
+    border-radius: 12px; padding: 20px 22px; box-shadow: var(--shadow);
+  }
+  .stamp {
+    width: 92px; height: 92px; border-radius: 14px;
+    display: grid; place-items: center;
+    border: 2px solid currentColor;
+    font-family: var(--mono); font-weight: 700; font-size: 40px; letter-spacing: -0.02em;
+    position: relative;
+  }
+  .stamp small { position: absolute; bottom: 8px; right: 10px; font-size: 12px; letter-spacing: 0; }
+  .readout .rlabel { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+  .readout .rline { font-family: var(--mono); font-size: 15px; margin-top: 6px; }
+  .readout .rline .n { font-weight: 700; }
+  .bar { height: 8px; border-radius: 999px; background: var(--rule-soft); margin-top: 12px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; border-radius: 999px; }
+
+  /* ── section frame ── */
+  section { padding: 46px 0; border-top: 1px solid var(--rule); }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 22px; }
+  .sec-head .num { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: .1em; }
+  .sec-head h2 { font-family: var(--mono); font-size: 20px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+  .sec-head .note { margin-left: auto; font-size: 13px; color: var(--ink-soft); }
+
+  /* ── leaderboard ── */
+  .board { width: 100%; }
+  .board .scroll { overflow-x: auto; }
+  table.lb { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 520px; }
+  table.lb th {
+    text-align: left; font-family: var(--mono); font-weight: 600; font-size: 11px;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft);
+    padding: 0 10px 10px; border-bottom: 1px solid var(--rule);
+  }
+  table.lb td { padding: 11px 10px; border-bottom: 1px solid var(--rule-soft); vertical-align: middle; }
+  table.lb tr:last-child td { border-bottom: 0; }
+  .rank { font-family: var(--mono); color: var(--ink-soft); width: 30px; }
+  .repo { font-family: var(--mono); font-weight: 600; }
+  .repo .kind { display: block; font-family: var(--sans); font-weight: 400; font-size: 11px; color: var(--ink-soft); letter-spacing: .02em; }
+  .grade-chip {
+    font-family: var(--mono); font-weight: 700; font-size: 13px;
+    border: 1.5px solid currentColor; border-radius: 7px; padding: 2px 9px; display: inline-block; min-width: 34px; text-align: center;
+  }
+  .score-cell { width: 190px; }
+  .score-cell .row { display: flex; align-items: center; gap: 10px; }
+  .score-cell .val { font-family: var(--mono); font-weight: 700; width: 30px; text-align: right; }
+  .score-cell .bar { flex: 1; margin: 0; }
+  .metric { font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; }
+
+  .gA { color: var(--gA); } .gB { color: var(--gB); } .gC { color: var(--gC); } .gD { color: var(--gD); }
+  .bgA { background: var(--gA); } .bgB { background: var(--gB); } .bgC { background: var(--gC); } .bgD { background: var(--gD); }
+
+  .roast {
+    margin-top: 18px; font-size: 13.5px; color: var(--ink-soft);
+    border-left: 2px solid var(--accent); padding: 4px 0 4px 14px;
+  }
+  .roast b { color: var(--ink); }
+
+  /* ── axes grid ── */
+  .axes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+  .axis { background: var(--panel); padding: 18px 18px; }
+  .axis .k { font-family: var(--mono); font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 9px; }
+  .axis .k .dot { width: 8px; height: 8px; border-radius: 2px; }
+  .axis p { margin: 8px 0 0; font-size: 13.5px; color: var(--ink-soft); }
+
+  /* ── trust cards ── */
+  .trust { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--rule); border-radius: 12px; padding: 18px 18px; box-shadow: var(--shadow); }
+  .card .h { font-family: var(--mono); font-weight: 700; font-size: 14px; }
+  .card p { margin: 8px 0 0; font-size: 13.5px; color: var(--ink-soft); }
+  .card .fig { font-family: var(--mono); font-weight: 700; font-size: 22px; margin-top: 12px; letter-spacing: -0.01em; }
+
+  /* ── start ── */
+  .steps { display: grid; gap: 12px; }
+  .step { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; }
+  .step .n { font-family: var(--mono); font-weight: 700; color: var(--accent); font-size: 13px; padding-top: 2px; }
+  .step .body code { font-family: var(--mono); background: var(--rule-soft); padding: 2px 6px; border-radius: 5px; font-size: 13px; }
+  .step .body .desc { font-size: 13.5px; color: var(--ink-soft); margin-top: 3px; }
+  .badge-demo { font-family: var(--mono); font-size: 12px; display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; margin-top: 6px; }
+  .badge-demo .l { padding: 3px 8px; background: var(--rule-soft); color: var(--ink-soft); }
+  .badge-demo .r { padding: 3px 8px; color: #fff; font-weight: 700; }
+
+  footer { border-top: 1px solid var(--rule); padding: 30px 0 50px; color: var(--ink-soft); font-size: 13px; }
+  footer .frow { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: center; }
+  footer .mono { font-size: 12px; }
+
+  @media (max-width: 620px) {
+    .axes, .trust { grid-template-columns: 1fr; }
+    .readout { grid-template-columns: 1fr; }
+    .stamp { width: 72px; height: 72px; font-size: 32px; }
+    .sec-head .note { display: none; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .stamp { animation: stampIn .5s cubic-bezier(.2,.9,.3,1.2) both; }
+    .bar > i { animation: grow .9s cubic-bezier(.2,.7,.2,1) both; }
+    @keyframes stampIn { from { transform: scale(.7) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes grow { from { transform: scaleX(0); transform-origin: left; } to { transform: scaleX(1); } }
+  }
+</style>
+
+<header class="mast">
+  <div class="wrap mast-row">
+    <div class="brand">clean<span class="sp">·</span>score</div>
+    <div class="mast-meta">m1kkit&nbsp;stats · v0.0.37</div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="hero" style="border-top:0">
+    <div class="eyebrow">정적 분석 · 100% 로컬 · LLM 0</div>
+    <h1>당신의 코드베이스,<br>3분 만에 채점한다.</h1>
+    <p class="lede">명령 한 줄. 설정 제로. 코드는 컴퓨터 밖으로 <b>한 발짝도</b> 안 나간다.
+      인지 복잡도·중복·데드코드·루프 IO를 재서 <b>A+ ~ D</b> 등급을 매긴다.</p>
+
+    <div class="cmd">
+      <span class="dollar">$</span>
+      <code>npx @m1kapp/kit stats <span class="flag">--dir=src</span></code>
+      <span class="tag">복사</span>
+    </div>
+
+    <div class="readout" aria-label="예시 결과">
+      <div class="stamp gB">B<small>78</small></div>
+      <div>
+        <div class="rlabel">예시 출력</div>
+        <div class="rline mono">청결도: <span class="n gB">B (78점)</span> — 함수 4,908개 · 중복 15% · 데드 12개</div>
+        <div class="bar"><i class="bgB" style="width:78%"></i></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">01</span>
+      <h2>유명 오픈소스, 실제 점수</h2>
+      <span class="note">같은 자, 예외 없음</span>
+    </div>
+
+    <div class="board">
+      <div class="scroll">
+        <table class="lb tnum">
+          <thead>
+            <tr><th>#</th><th>프로젝트</th><th>등급</th><th class="score-cell">점수</th><th>핵심 지표</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rank">1</td><td class="repo">mitt<span class="kind">이벤트 에미터</span></td><td><span class="grade-chip gA">A+</span></td><td class="score-cell"><div class="row"><span class="val gA">100</span><div class="bar"><i class="bgA" style="width:100%"></i></div></div></td><td class="metric">중복 0% · cog 최대 4</td></tr>
+            <tr><td class="rank">2</td><td class="repo">execa<span class="kind">프로세스 실행</span></td><td><span class="grade-chip gA">A+</span></td><td class="score-cell"><div class="row"><span class="val gA">99</span><div class="bar"><i class="bgA" style="width:99%"></i></div></div></td><td class="metric">중복 0.7%</td></tr>
+            <tr><td class="rank">3</td><td class="repo">zustand<span class="kind">상태관리</span></td><td><span class="grade-chip gA">A+</span></td><td class="score-cell"><div class="row"><span class="val gA">93</span><div class="bar"><i class="bgA" style="width:93%"></i></div></div></td><td class="metric">중복 0%</td></tr>
+            <tr><td class="rank">4</td><td class="repo">nanoid<span class="kind">ID 생성</span></td><td><span class="grade-chip gA">A+</span></td><td class="score-cell"><div class="row"><span class="val gA">92</span><div class="bar"><i class="bgA" style="width:92%"></i></div></div></td><td class="metric">중복 11%</td></tr>
+            <tr><td class="rank">5</td><td class="repo">jotai<span class="kind">상태관리</span></td><td><span class="grade-chip gA">A+</span></td><td class="score-cell"><div class="row"><span class="val gA">91</span><div class="bar"><i class="bgA" style="width:91%"></i></div></div></td><td class="metric">중복 1.8%</td></tr>
+            <tr><td class="rank">6</td><td class="repo">immich<span class="kind">앱 · NestJS 서버</span></td><td><span class="grade-chip gA">A+</span></td><td class="score-cell"><div class="row"><span class="val gA">90</span><div class="bar"><i class="bgA" style="width:90%"></i></div></div></td><td class="metric">518파일 · 중복 3.1%</td></tr>
+            <tr><td class="rank">7</td><td class="repo">immer<span class="kind">불변성</span></td><td><span class="grade-chip gA">A</span></td><td class="score-cell"><div class="row"><span class="val gA">84</span><div class="bar"><i class="bgA" style="width:84%"></i></div></div></td><td class="metric">중복 0.8%</td></tr>
+            <tr><td class="rank">8</td><td class="repo">excalidraw<span class="kind">앱 · 캔버스</span></td><td><span class="grade-chip gB">B</span></td><td class="score-cell"><div class="row"><span class="val gB">77</span><div class="bar"><i class="bgB" style="width:77%"></i></div></div></td><td class="metric">420파일 · cog 최대 189</td></tr>
+            <tr><td class="rank">9</td><td class="repo">ky<span class="kind">HTTP 클라이언트</span></td><td><span class="grade-chip gB">B</span></td><td class="score-cell"><div class="row"><span class="val gB">76</span><div class="bar"><i class="bgB" style="width:76%"></i></div></div></td><td class="metric">cog 최대 92 (밀도)</td></tr>
+            <tr><td class="rank">10</td><td class="repo">vite<span class="kind">번들러</span></td><td><span class="grade-chip gC">C</span></td><td class="score-cell"><div class="row"><span class="val gC">68</span><div class="bar"><i class="bgC" style="width:68%"></i></div></div></td><td class="metric">cog 최대 195</td></tr>
+            <tr><td class="rank">11</td><td class="repo">zod<span class="kind">스키마 검증</span></td><td><span class="grade-chip gC">C</span></td><td class="score-cell"><div class="row"><span class="val gC">67</span><div class="bar"><i class="bgC" style="width:67%"></i></div></div></td><td class="metric">중복 16%</td></tr>
+            <tr><td class="rank">12</td><td class="repo">hono<span class="kind">웹 프레임워크</span></td><td><span class="grade-chip gC">C</span></td><td class="score-cell"><div class="row"><span class="val gC">65</span><div class="bar"><i class="bgC" style="width:65%"></i></div></div></td><td class="metric">중복 23%</td></tr>
+            <tr><td class="rank">13</td><td class="repo">valibot<span class="kind">스키마 검증</span></td><td><span class="grade-chip gD">D</span></td><td class="score-cell"><div class="row"><span class="val gD">58</span><div class="bar"><i class="bgD" style="width:58%"></i></div></div></td><td class="metric">중복 43% (수백 유사 모듈)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p class="roast"><b>그래, valibot이 D다.</b> 근데 이건 "나쁜 코드"가 아니라 수백 개의 거의 동일한 스키마 모듈 = 구조적 중복이 높다는 뜻.
+      점수는 판결이 아니라 <b>측정</b>이다. 무엇을 재는지 아래에 다 공개한다.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">02</span>
+      <h2>무엇을 재는가</h2>
+      <span class="note">SonarQube가 안 재는 축까지</span>
+    </div>
+    <div class="axes">
+      <div class="axis"><div class="k"><span class="dot bgB"></span>인지 복잡도</div><p>함수당 중첩·분기 가중 복잡도. 사람이 못 읽는 괴물 함수를 지목한다.</p></div>
+      <div class="axis"><div class="k"><span class="dot bgD"></span>중복</div><p>토큰 단위 복붙 검출. 변수명만 바꾼 위장은 잡되, 구조적 유사는 관용한다.</p></div>
+      <div class="axis"><div class="k"><span class="dot bgA"></span>데드코드 <span class="mono" style="font-size:11px;color:var(--ink-soft)">--dead</span></div><p>knip 내장. 죽은 파일·미사용 export를 감점. <code style="font-family:var(--mono);font-size:11px">// @keep</code> 주석으로 "코드 밖 호출자"(크론·웹훅·QR)를 살려둔다.</p></div>
+      <div class="axis"><div class="k"><span class="dot bgC"></span>루프 IO</div><p>루프 안에서 파일을 N번 읽는 구조. 복잡도·중복이 원리상 못 잡는 N+1을 드러낸다.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">03</span>
+      <h2>왜 믿나</h2>
+      <span class="note">점수는 방어할 수 있어야 점수다</span>
+    </div>
+    <div class="trust">
+      <div class="card"><div class="h">게임 불가</div><p>비율은 코드 질량(LOC) 기준. 빈 파일을 8,000개 넣어도 점수는 그대로다 — 자잘 파일은 분석에서 제외된다.</p><div class="fig">+8000 파일 → ±0점</div></div>
+      <div class="card"><div class="h">OSS 17종으로 보정</div><p>계수는 존경받는 오픈소스 라이브러리·앱 분포에 맞춰 역산했다. 임의의 임계값이 아니다.</p><div class="fig">중앙값 84 · A</div></div>
+      <div class="card"><div class="h">네거티브 컨트롤</div><p>일부러 만든 병적 코드(중복 100%, 함수 전부 괴물)를 검증용으로 채점 — 최하위에 정확히 떨어진다.</p><div class="fig gD">병적 코드 → 38 · D</div></div>
+      <div class="card"><div class="h">로컬 · 무료 · LLM 0</div><p>CLI가 당신 컴퓨터에서 정적 분석한다. 코드가 서버로 전송되지 않는다. API 키도, 비용도 없다.</p><div class="fig">3분 · $0</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="num">04</span>
+      <h2>시작하기</h2>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="n">01</div><div class="body"><code>npx @m1kapp/kit stats --dir=src</code><div class="desc">git 추적 파일만 분석한다. 빌드 산출물은 자동 제외.</div></div></div>
+      <div class="step"><div class="n">02</div><div class="body"><code>npx @m1kapp/kit stats --dir=src --dead</code><div class="desc">데드코드 축 추가 (knip 내장). 프로젝트 전체를 한 번 훑는다.</div></div></div>
+      <div class="step"><div class="n">03</div><div class="body">README 배지로 자랑<div class="badge-demo"><span class="l">clean&nbsp;score</span><span class="r bgA">A · 90</span></div></div></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap frow">
+    <span>청결점수 — <span class="mono">@m1kapp/kit stats</span></span>
+    <span class="mono">정적 분석 · 로컬 실행 · 오픈소스</span>
+  </div>
+</footer>

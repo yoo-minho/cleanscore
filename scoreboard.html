@@ -1,0 +1,110 @@
+<title>청결점수 스코어보드</title>
+<style>
+  :root {
+    --paper:#f4f5f8; --panel:#fbfbfd; --ink:#14161c; --ink-soft:#5a606b; --ink-faint:#8b9199;
+    --rule:#dde1e8; --rule-soft:#eaedf2; --accent:#4148d8;
+    --gA:#12915a; --gB:#b6841a; --gC:#d4701a; --gD:#cb4436;
+    --track:#e9ebf0;
+    --mono:ui-monospace,"SF Mono","SFMono-Regular",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--paper:#0e1014;--panel:#14171d;--ink:#e8eaf0;--ink-soft:#9aa1ad;--ink-faint:#6b7280;
+      --rule:#262b34;--rule-soft:#1c212a;--accent:#7b82ff;
+      --gA:#37cb8b;--gB:#e0b445;--gC:#ec8b43;--gD:#ec6152;--track:#20242c;}
+  }
+  :root[data-theme="light"]{--paper:#f4f5f8;--panel:#fbfbfd;--ink:#14161c;--ink-soft:#5a606b;--ink-faint:#8b9199;--rule:#dde1e8;--rule-soft:#eaedf2;--gA:#12915a;--gB:#b6841a;--gC:#d4701a;--gD:#cb4436;--track:#e9ebf0;}
+  :root[data-theme="dark"]{--paper:#0e1014;--panel:#14171d;--ink:#e8eaf0;--ink-soft:#9aa1ad;--ink-faint:#6b7280;--rule:#262b34;--rule-soft:#1c212a;--gA:#37cb8b;--gB:#e0b445;--gC:#ec8b43;--gD:#ec6152;--track:#20242c;}
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
+  .card{max-width:1040px;margin:0 auto;padding:40px 44px 34px;}
+  .tnum{font-variant-numeric:tabular-nums;}
+  .mono{font-family:var(--mono);}
+
+  .top{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;border-bottom:1px solid var(--rule);padding-bottom:18px;}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);}
+  h1{font-family:var(--mono);font-weight:700;font-size:26px;letter-spacing:-.01em;margin:8px 0 0;}
+  .legend{display:flex;gap:14px;font-family:var(--mono);font-size:12px;color:var(--ink-soft);}
+  .legend span{display:flex;align-items:center;gap:6px;}
+  .legend i{width:11px;height:11px;border-radius:3px;display:inline-block;}
+
+  .chart{position:relative;margin-top:40px;}
+  /* median line */
+  .median{position:absolute;top:14px;bottom:34px;width:0;border-left:1.5px dashed var(--accent);opacity:.7;}
+  .median b{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:11px;font-weight:600;color:var(--accent);white-space:nowrap;letter-spacing:.02em;background:var(--paper);padding:0 6px;}
+
+  .row{display:grid;grid-template-columns:26px 150px 40px 1fr;align-items:center;gap:12px;padding:5px 0;}
+  .rank{font-family:var(--mono);font-size:12px;color:var(--ink-faint);text-align:right;}
+  .repo{font-family:var(--mono);font-weight:600;font-size:14px;line-height:1.15;}
+  .repo .kind{display:block;font-family:var(--sans);font-weight:400;font-size:10.5px;color:var(--ink-faint);letter-spacing:.01em;margin-top:1px;}
+  .chip{font-family:var(--mono);font-weight:700;font-size:12px;text-align:center;border:1.5px solid currentColor;border-radius:6px;padding:1px 0;}
+  .track{position:relative;height:22px;background:var(--track);border-radius:6px;overflow:hidden;}
+  .fill{height:100%;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;}
+  .fill b{font-family:var(--mono);font-weight:700;font-size:12.5px;color:#fff;padding-right:9px;letter-spacing:.02em;}
+  .fill.lite b{color:var(--ink);} /* not used; white on colored fill */
+
+  .gA{color:var(--gA);} .gB{color:var(--gB);} .gC{color:var(--gC);} .gD{color:var(--gD);}
+  .bgA{background:var(--gA);} .bgB{background:var(--gB);} .bgC{background:var(--gC);} .bgD{background:var(--gD);}
+
+  .divider{display:flex;align-items:center;gap:12px;margin:14px 0 8px;padding-left:216px;}
+  .divider .lbl{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);}
+  .divider .ln{flex:1;height:1px;background:var(--rule);}
+  .row.control .track{background:repeating-linear-gradient(45deg,var(--track),var(--track) 6px,transparent 6px,transparent 12px);border:1px dashed var(--rule);}
+  .row.control .repo .kind{color:var(--gD);}
+
+  .foot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:26px;padding-top:16px;border-top:1px solid var(--rule);flex-wrap:wrap;}
+  .foot .cmd{font-family:var(--mono);font-size:13px;background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:7px 12px;}
+  .foot .cmd .d{color:var(--accent);font-weight:700;}
+  .foot .tags{font-family:var(--mono);font-size:12px;color:var(--ink-soft);letter-spacing:.02em;}
+  .axis{display:grid;grid-template-columns:26px 150px 40px 1fr;gap:12px;margin-top:8px;}
+  .axis .scale{position:relative;height:14px;font-family:var(--mono);font-size:10px;color:var(--ink-faint);}
+  .axis .scale span{position:absolute;transform:translateX(-50%);}
+</style>
+
+<div class="card">
+  <div class="top">
+    <div>
+      <div class="eyebrow">청결점수 · 정적 분석 · A+ ~ D</div>
+      <h1>유명 오픈소스, 실제 점수</h1>
+    </div>
+    <div class="legend">
+      <span><i class="bgA"></i>A+/A</span>
+      <span><i class="bgB"></i>B</span>
+      <span><i class="bgC"></i>C</span>
+      <span><i class="bgD"></i>D</span>
+    </div>
+  </div>
+
+  <div class="chart">
+    <!-- median at 83% of the bar track; track starts at col 4. left offset = 26+150+40+12*3 = 252px + gaps -->
+    <div class="median" style="left:calc(252px + (100% - 252px) * 0.83);"><b>존경군 중앙값 83</b></div>
+
+    <div class="row"><div class="rank">1</div><div class="repo">mitt<span class="kind">이벤트 에미터</span></div><div class="chip gA">A+</div><div class="track"><div class="fill bgA" style="width:100%"><b>100</b></div></div></div>
+    <div class="row"><div class="rank">2</div><div class="repo">execa<span class="kind">프로세스 실행</span></div><div class="chip gA">A+</div><div class="track"><div class="fill bgA" style="width:99%"><b>99</b></div></div></div>
+    <div class="row"><div class="rank">3</div><div class="repo">zustand<span class="kind">상태관리</span></div><div class="chip gA">A+</div><div class="track"><div class="fill bgA" style="width:93%"><b>93</b></div></div></div>
+    <div class="row"><div class="rank">4</div><div class="repo">nanoid<span class="kind">ID 생성</span></div><div class="chip gA">A+</div><div class="track"><div class="fill bgA" style="width:92%"><b>92</b></div></div></div>
+    <div class="row"><div class="rank">5</div><div class="repo">clsx<span class="kind">클래스 유틸</span></div><div class="chip gA">A+</div><div class="track"><div class="fill bgA" style="width:92%"><b>92</b></div></div></div>
+    <div class="row"><div class="rank">6</div><div class="repo">jotai<span class="kind">상태관리</span></div><div class="chip gA">A+</div><div class="track"><div class="fill bgA" style="width:91%"><b>91</b></div></div></div>
+    <div class="row"><div class="rank">7</div><div class="repo">immich<span class="kind">앱 · NestJS 서버</span></div><div class="chip gA">A</div><div class="track"><div class="fill bgA" style="width:89%"><b>89</b></div></div></div>
+    <div class="row"><div class="rank">8</div><div class="repo">immer<span class="kind">불변성</span></div><div class="chip gA">A</div><div class="track"><div class="fill bgA" style="width:84%"><b>84</b></div></div></div>
+    <div class="row"><div class="rank">9</div><div class="repo">p-map<span class="kind">동시성 유틸</span></div><div class="chip gA">A</div><div class="track"><div class="fill bgA" style="width:84%"><b>84</b></div></div></div>
+    <div class="row"><div class="rank">10</div><div class="repo">express<span class="kind">웹 프레임워크</span></div><div class="chip gA">A</div><div class="track"><div class="fill bgA" style="width:82%"><b>82</b></div></div></div>
+    <div class="row"><div class="rank">11</div><div class="repo">ky<span class="kind">HTTP 클라이언트</span></div><div class="chip gB">B</div><div class="track"><div class="fill bgB" style="width:76%"><b>76</b></div></div></div>
+    <div class="row"><div class="rank">12</div><div class="repo">excalidraw<span class="kind">앱 · 캔버스</span></div><div class="chip gB">B</div><div class="track"><div class="fill bgB" style="width:76%"><b>76</b></div></div></div>
+    <div class="row"><div class="rank">13</div><div class="repo">zod<span class="kind">스키마 검증</span></div><div class="chip gC">C</div><div class="track"><div class="fill bgC" style="width:66%"><b>66</b></div></div></div>
+    <div class="row"><div class="rank">14</div><div class="repo">vite<span class="kind">번들러</span></div><div class="chip gC">C</div><div class="track"><div class="fill bgC" style="width:66%"><b>66</b></div></div></div>
+    <div class="row"><div class="rank">15</div><div class="repo">hono<span class="kind">웹 프레임워크</span></div><div class="chip gC">C</div><div class="track"><div class="fill bgC" style="width:64%"><b>64</b></div></div></div>
+    <div class="row"><div class="rank">16</div><div class="repo">valibot<span class="kind">스키마 검증</span></div><div class="chip gD">D</div><div class="track"><div class="fill bgD" style="width:57%"><b>57</b></div></div></div>
+
+    <div class="divider"><span class="lbl">대조군</span><span class="ln"></span></div>
+    <div class="row control"><div class="rank">—</div><div class="repo">병적 코드<span class="kind">대조군 · 중복 100%</span></div><div class="chip gD">D</div><div class="track"><div class="fill bgD" style="width:36%"><b>36</b></div></div></div>
+
+    <div class="axis"><div></div><div></div><div></div><div class="scale"><span style="left:0%">0</span><span style="left:50%">50</span><span style="left:100%">100</span></div></div>
+  </div>
+
+  <div class="foot">
+    <div class="cmd"><span class="d">$</span> npx @m1kapp/kit stats --dir=src</div>
+    <div class="tags">게임 불가 · 로컬 · 무료 · LLM 0</div>
+  </div>
+</div>
