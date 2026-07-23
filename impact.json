@@ -1,0 +1,11 @@
+{
+  "findings": [
+    {
+      "title": "deleteBulkMetadata N+1",
+      "type": "N+1 (루프 안 순차 DELETE, item당 왕복 1회)",
+      "repo": "immich-app/immich",
+      "repoLabel": "immich · 108k★",
+      "pr": 30163
+    }
+  ]
+}
