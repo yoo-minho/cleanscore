@@ -1,6 +1,6 @@
 {
   "name": "cleanscore",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "3분 만에 코드베이스 청결점수 — 정적 분석, 100% 로컬, A+~D 등급. 게임 불가.",
   "type": "module",
   "bin": {

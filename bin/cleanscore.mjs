@@ -814,9 +814,10 @@ function analyzeTextbookIssues(ts, fileContents) {
       return false;
     };
 
-    const walk = (node, inLoop) => {
+    const walk = (node, inLoop, inRealLoop) => {
       let childInLoop = inLoop;
-      if (isLoopNode(node)) childInLoop = true;
+      let childInRealLoop = inRealLoop;
+      if (isLoopNode(node)) { childInLoop = true; childInRealLoop = true; }
 
       if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
         const method = node.expression.name.getText(sf);
@@ -844,7 +845,8 @@ function analyzeTextbookIssues(ts, fileContents) {
         }
 
         if (ITERATING_METHODS.has(method)) {
-          for (const arg of node.arguments) if (isFnLike(arg)) walk(arg, true);
+          // 순회 콜백은 "루프"지만 진짜 반복문은 아니다 — 모듈 로드 시 1회 도는 map()도 여기 해당.
+          for (const arg of node.arguments) if (isFnLike(arg)) walk(arg, true, inRealLoop);
         }
       }
 
@@ -853,7 +855,8 @@ function analyzeTextbookIssues(ts, fileContents) {
         spreadAccumulator.push({ file, line: lineOf(node), where: "loop" });
       }
 
-      if (inLoop && ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.getText(sf) === "RegExp") {
+      // 진짜 반복문(for/while) 안에서만 — .map()으로 1회 만드는 캐시는 재컴파일이 아니다.
+      if (inRealLoop && ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.getText(sf) === "RegExp") {
         regexInLoop.push({ file, line: lineOf(node) });
       }
 
@@ -861,10 +864,10 @@ function analyzeTextbookIssues(ts, fileContents) {
         const alreadyWalked =
           ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
           ITERATING_METHODS.has(node.expression.name.getText(sf)) && isFnLike(child);
-        if (!alreadyWalked) walk(child, childInLoop);
+        if (!alreadyWalked) walk(child, childInLoop, childInRealLoop);
       });
     };
-    ts.forEachChild(sf, (n) => walk(n, false));
+    ts.forEachChild(sf, (n) => walk(n, false, false));
   }
 
   return {
