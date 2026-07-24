@@ -27,6 +27,13 @@
       "repo": "twentyhq/twenty",
       "repoLabel": "twenty · 53558★",
       "pr": 23231
+    },
+    {
+      "title": "nested relations hydration O(n²)",
+      "type": "O(n²) 그룹핑/조회 (부모 레코드마다 관계행 전수 스캔 → Map)",
+      "repo": "twentyhq/twenty",
+      "repoLabel": "twenty · 37k★",
+      "pr": 23232
     }
   ]
 }
