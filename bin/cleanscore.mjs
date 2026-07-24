@@ -830,6 +830,7 @@ function analyzeTextbookIssues(ts, fileContents) {
   const loopInvariantIndex = [];
   const sharedRefFill = [];
   const numericSortNoComparator = [];
+  const emptyCatch = [];
   const statefulRegex = [];
   const forInArray = [];
 
@@ -982,6 +983,11 @@ function analyzeTextbookIssues(ts, fileContents) {
         }
       }
 
+      // ── 완전히 빈 catch: catch (e) {} — 에러를 삼킨다. 로그·주석도 없다.
+      if (ts.isCatchClause(node) && node.block.statements.length === 0) {
+        emptyCatch.push({ file, line: lineOf(node) });
+      }
+
       // ── Array(n).fill([]) / .fill({}) : 참조 하나를 모든 칸이 공유한다.
       // arr[0].push(x) 하면 모든 칸이 바뀐다 — 조용히 틀린 답. 고침은 Array.from({length:n}, () => []).
       if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
@@ -1111,6 +1117,7 @@ function analyzeTextbookIssues(ts, fileContents) {
     loopInvariantIndex: { count: loopInvariantIndex.length, worst: loopInvariantIndex.slice(0, 6) },
     sharedRefFill: { count: sharedRefFill.length, worst: sharedRefFill.slice(0, 6) },
     numericSortNoComparator: { count: numericSortNoComparator.length, worst: numericSortNoComparator.slice(0, 6) },
+    emptyCatch: { count: emptyCatch.length, worst: emptyCatch.slice(0, 8) },
     statefulRegex: { count: statefulRegex.length, worst: statefulRegex.slice(0, 6) },
     forInArray: { count: forInArray.length, worst: forInArray.slice(0, 6) },
   };
@@ -1649,6 +1656,10 @@ if (textbook) {
   if (t.forInArray.count > 0) {
     console.log(`  ⚠ 배열에 for...in: ${t.forInArray.count}곳 — 인덱스가 문자열이고 상속 속성까지 돕니다 (for...of 권장)`);
     for (const w of t.forInArray.worst) console.log(`    ${w.name} — ${w.file}:${w.line}`);
+  }
+  if (t.emptyCatch.count > 0) {
+    console.log(`  빈 catch: ${t.emptyCatch.count}곳 — 에러를 삼킵니다 (최소한 로그나 주석을)`);
+    for (const w of t.emptyCatch.worst.slice(0, 4)) console.log(`    ${w.file}:${w.line}`);
   }
   if (t.sharedRefFill.count > 0) {
     console.log(`  ⚠ 공유 참조 fill: ${t.sharedRefFill.count}곳 — Array(n).fill([]/{}) 는 참조 하나를 모든 칸이 공유합니다 (한 칸 수정 = 전부 수정, 조용한 버그)`);
