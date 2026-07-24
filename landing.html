@@ -170,6 +170,24 @@
   table.lb td.ctx, table.lb th.ctx { color: var(--ink-soft); }
   table.lb th { white-space: nowrap; }
   .repo .kind code { font-family: var(--mono); font-size: 10px; background: var(--rule-soft); padding: 0 4px; border-radius: 3px; }
+  .tip-btn { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px; letter-spacing: inherit; text-transform: inherit; }
+  .tip-btn:hover { color: var(--accent-ink); }
+  .tip-i { display: inline-grid; place-items: center; width: 13px; height: 13px; border-radius: 50%;
+    border: 1px solid currentColor; font-size: 9px; opacity: .55; }
+  .tip-btn:hover .tip-i { opacity: 1; }
+  dialog#tipdlg { margin: auto; max-width: 460px; width: calc(100% - 32px); border: 1px solid var(--rule); border-radius: 12px;
+    background: var(--panel); color: var(--ink); padding: 0; box-shadow: 0 24px 60px -20px rgba(0,0,0,.5); }
+  dialog#tipdlg::backdrop { background: rgba(0,0,0,.45); }
+  .tip-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px 12px; border-bottom: 1px solid var(--rule); }
+  .tip-head h3 { font-family: var(--mono); font-size: 15px; font-weight: 700; margin: 0; flex: 1; }
+  .tip-x { font: inherit; background: none; border: 0; color: var(--ink-soft); cursor: pointer; font-size: 14px; padding: 2px 4px; }
+  .tip-x:hover { color: var(--ink); }
+  .tip-body { padding: 16px 18px; font-size: 13.5px; line-height: 1.65; color: var(--ink-soft); }
+  .tip-body b { color: var(--ink); }
+  .tip-body code { font-family: var(--mono); font-size: 12px; background: var(--rule-soft); padding: 1px 5px; border-radius: 4px; }
+  .tip-thr { padding: 10px 18px 16px; font-family: var(--mono); font-size: 11.5px; color: var(--accent-ink);
+    border-top: 1px solid var(--rule-soft); }
   .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
   .legend span { white-space: nowrap; }
 
@@ -287,7 +305,7 @@
       <div class="scroll">
         <table class="lb tnum">
           <thead>
-            <tr><th>#</th><th>프로젝트 · 기준</th><th>등급</th><th>점수</th><th class="ctx">파일</th><th class="ctx">코드줄</th><th>중복</th><th>maxCog</th><th>cog15+</th><th>평균줄</th><th>O(n²)</th></tr>
+            <tr><th>#</th><th>프로젝트 · 기준</th><th><button class="tip-btn" data-tip="grade" aria-label="등급 설명 보기">등급<span class="tip-i">?</span></button></th><th><button class="tip-btn" data-tip="score" aria-label="점수 설명 보기">점수<span class="tip-i">?</span></button></th><th class="ctx"><button class="tip-btn" data-tip="files" aria-label="파일 설명 보기">파일<span class="tip-i">?</span></button></th><th class="ctx"><button class="tip-btn" data-tip="loc" aria-label="코드줄 설명 보기">코드줄<span class="tip-i">?</span></button></th><th><button class="tip-btn" data-tip="dup" aria-label="중복 설명 보기">중복<span class="tip-i">?</span></button></th><th><button class="tip-btn" data-tip="maxcog" aria-label="maxCog 설명 보기">maxCog<span class="tip-i">?</span></button></th><th><button class="tip-btn" data-tip="cog15" aria-label="cog15+ 설명 보기">cog15+<span class="tip-i">?</span></button></th><th><button class="tip-btn" data-tip="avg" aria-label="평균줄 설명 보기">평균줄<span class="tip-i">?</span></button></th><th><button class="tip-btn" data-tip="quad" aria-label="O(n²) 설명 보기">O(n²)<span class="tip-i">?</span></button></th></tr>
           </thead>
           <tbody>
             <tr><td class="rank">1</td><td class="repo"><a href="https://github.com/developit/mitt" target="_blank" rel="noopener">mitt</a><span class="kind">★ 11.9k · <code>main@6b41670</code></span></td><td><span class="grade-chip gA">A+</span></td><td class="num" style="background:rgba(18,145,90,0.47)"><b>100</b></td><td class="num ctx">1</td><td class="num ctx">75</td><td class="num" style="background:rgba(18,145,90,0.47)">0%</td><td class="num" style="background:rgba(18,145,90,0.47)">4</td><td class="num" style="background:rgba(18,145,90,0.47)">0.0%</td><td class="num" style="background:rgba(18,145,90,0.47)">75</td><td class="num" style="background:rgba(18,145,90,0.47)">0</td></tr>
@@ -427,6 +445,40 @@
   </section>
 
 </main>
+
+
+<dialog id="tipdlg" aria-labelledby="tipttl">
+  <div class="tip-head"><h3 id="tipttl"></h3><button class="tip-x" aria-label="닫기">✕</button></div>
+  <div class="tip-body"></div>
+  <div class="tip-thr"></div>
+</dialog>
+<script>
+(function () {
+  var TIPS = {
+    grade: { t: "등급", b: "점수를 다섯 구간으로 자른 것. 점수 자체가 이미 감점의 합이라, 등급은 한눈에 보라고 붙인 라벨이다.", thr: "A+ ≥90 · A ≥80 · B ≥70 · C ≥60 · D <60" },
+    score: { t: "점수", b: "100점에서 시작해 축별로 감점한다. 인지 복잡도(함수 비율·최악 함수), 중복 밀도, 파일 크기(200줄+ 심각도·평균 줄)를 본다. 계수는 존경받는 오픈소스 분포에 맞춰 역산했다 — 임의의 임계값이 아니다.<br><br><b>점수는 판결이 아니라 측정이다.</b> 낮다고 나쁜 코드라는 뜻이 아니라, 이 자로 재면 이렇게 나온다는 뜻이다.", thr: "대조군(일부러 만든 병적 코드) 30 · 코퍼스 중앙값 75" },
+    files: { t: "파일", b: "실제로 분석한 파일 수. 테스트·벤치·스토리·타입선언, <code>compiled/</code>·<code>vendor/</code> 같은 벤더 디렉토리, 미니파이·번들 파일, 코드 5줄 미만 자잘 파일을 <b>모두 제외한 뒤</b>의 숫자다.<br><br>커밋된 벤더 번들을 빼지 않으면 지표가 통째로 오염된다 — next.js가 그래서 처음에 D 27로 나왔다(실제로는 C 66).", thr: "크기는 품질이 아니다 — 그래서 색을 칠하지 않는다" },
+    loc: { t: "코드줄", b: "빈 줄과 주석만 있는 줄을 뺀 코드 줄 수. 규모를 가늠하는 맥락 값이다.", thr: "크기는 품질이 아니다 — 색 없음" },
+    dup: { t: "중복", b: "토큰 단위로 잡은 복붙 밀도. 식별자를 원문 그대로 두기 때문에 <b>정확한 복붙만</b> 잡는다 — 변수명을 바꾼 복붙은 놓치는 대신, 스키마·타입 라이브러리의 구조적 유사를 복붙으로 오인하지 않는다.<br><br>valibot의 43%는 \"나쁜 코드\"가 아니라 수백 개의 거의 동일한 스키마 모듈이라는 뜻이다.", thr: "≤8% 좋음 · ≥30% 나쁨 (SonarQube 게이트는 3%)" },
+    maxcog: { t: "maxCog — 최악 함수의 인지 복잡도", b: "<b>인지 복잡도(cognitive complexity)</b>는 \"사람이 읽기 얼마나 힘든가\"를 재는 값이다. 순환 복잡도(경로 수)와 달리 <b>중첩에 가중치</b>를 준다 — 같은 <code>if</code>라도 3중 안에 있으면 더 아프다.<br><br>여기 적힌 건 그 저장소에서 <b>가장 복잡한 함수 하나</b>의 값이다. 괴물 함수가 하나라도 있는지 보는 칸이다.", thr: "≤30 좋음 · ≥200 나쁨 (SonarQube 권고는 함수당 15)" },
+    cog15: { t: "cog15+ — 복잡한 함수의 비율", b: "인지 복잡도가 15를 넘는 함수가 전체 함수 중 몇 %인지. maxCog가 \"최악 하나\"라면 이건 \"얼마나 퍼져 있나\"다.<br><br>건강한 코드베이스도 몇 %는 넘는다 — 그래서 2% 초과분부터 감점한다.", thr: "≤2% 좋음 · ≥8% 나쁨" },
+    avg: { t: "평균줄", b: "파일 하나당 평균 코드 줄 수. 파일이 비대해지는지 본다. 큰 파일은 읽기·리뷰·충돌 모두에서 비싸다.", thr: "≤120 좋음 · ≥250 나쁨" },
+    quad: { t: "O(n²) — 루프 안 선형 탐색", b: "루프 안에서 <b>루프 밖 배열</b>에 <code>find</code>·<code>some</code>·<code>filter</code>를 돌리는 자리 수. 루프 n번 × 탐색 m번 = O(n·m)이고, Map/Set을 한 번 만들면 O(n+m)이 된다.<br><br>취향이 개입하지 않는 기계적 개선이라 외부 기여(PR)로도 안전한 축이다 — 실제로 이 축에서 cal.com·twenty에 PR을 냈다.<br><br><b>점수에는 반영하지 않는다</b>(진단 전용).", thr: "0 좋음 · ≥15 나쁨 · 점수 미반영" }
+  };
+  var dlg = document.getElementById("tipdlg");
+  if (!dlg) return;
+  var ttl = dlg.querySelector("#tipttl"), body = dlg.querySelector(".tip-body"), thr = dlg.querySelector(".tip-thr");
+  document.querySelectorAll(".tip-btn").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var d = TIPS[b.dataset.tip]; if (!d) return;
+      ttl.textContent = d.t; body.innerHTML = d.b; thr.textContent = d.thr;
+      if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+    });
+  });
+  dlg.querySelector(".tip-x").addEventListener("click", function () { dlg.close(); });
+  dlg.addEventListener("click", function (e) { if (e.target === dlg) dlg.close(); });
+})();
+</script>
 
 <footer>
   <div class="wrap frow">
