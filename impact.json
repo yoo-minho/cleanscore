@@ -20,6 +20,13 @@
       "repo": "calcom/cal.diy",
       "repoLabel": "cal.com · 46729★",
       "pr": 29828
+    },
+    {
+      "title": "view-widget-upsert O(n²)",
+      "type": "O(n²) 배열 조회 (4개 루프서 .find() 키조회 → Map)",
+      "repo": "twentyhq/twenty",
+      "repoLabel": "twenty · 53558★",
+      "pr": 23231
     }
   ]
 }
