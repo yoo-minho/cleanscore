@@ -244,15 +244,16 @@ function analyzeQuality(content) {
 
 // 프로젝트의 typescript 패키지 로드 (AST 기반 정밀 분석용)
 function loadTypescript() {
-  // 1) 타겟 프로젝트의 typescript (있으면 그 버전 사용)
-  try {
-    const req = createRequire(path.resolve(process.cwd(), "package.json"));
-    return req("typescript");
-  } catch {}
-  // 2) cleanscore 자신에 번들된 typescript (하드 의존 → npx 설치 시 항상 존재).
-  //    이게 없으면 타겟에 typescript 없을 때 조용히 regex 폴백으로 떨어져 점수가 달라진다(배지 비교 불가).
+  // 1) cleanscore에 번들된 typescript를 '먼저' 쓴다 — 같은 저장소를 어디서 실행하든
+  //    같은 점수가 나와야 배지가 비교 가능하다(예전엔 타겟의 TS 버전에 따라 점수가 흔들렸다).
   try {
     const req = createRequire(import.meta.url);
+    return req("typescript");
+  } catch {}
+  // 2) 폴백: 타겟 프로젝트의 typescript.
+  //    이게 없으면 타겟에 typescript 없을 때 조용히 regex 폴백으로 떨어져 점수가 달라진다(배지 비교 불가).
+  try {
+    const req = createRequire(path.resolve(process.cwd(), "package.json"));
     return req("typescript");
   } catch {}
   return null;
@@ -395,6 +396,16 @@ function tokenizeNormalized(ts, filePath, content) {
     .join("\n");
   const kind = /\.(tsx|jsx)$/.test(filePath) ? ts.LanguageVariant.JSX : ts.LanguageVariant.Standard;
   const scanner = ts.createScanner(ts.ScriptTarget.Latest, /*skipTrivia*/ true, kind, stripped);
+  const lineStarts = [0];
+  for (let i = 0; i < stripped.length; i++) if (stripped.charCodeAt(i) === 10) lineStarts.push(i + 1);
+  const lineOfOffset = (pos) => {
+    let lo = 0, hi = lineStarts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (lineStarts[mid] <= pos) lo = mid; else hi = mid - 1;
+    }
+    return lo + 1;
+  };
   const tokens = [];
   const lines = [];
   let tok = scanner.scan();
@@ -409,9 +420,9 @@ function tokenizeNormalized(ts, filePath, content) {
     else if (tok === ts.SyntaxKind.StringLiteral || tok === ts.SyntaxKind.NoSubstitutionTemplateLiteral || tok === ts.SyntaxKind.NumericLiteral) norm = scanner.getTokenText();
     else norm = String(tok);
     tokens.push(norm);
-    // 토큰 시작 위치의 줄 번호 (원본과 줄 구조 동일)
-    const upto = stripped.slice(0, scanner.getTokenStart());
-    lines.push(upto.split("\n").length);
+    // 토큰 시작 위치의 줄 번호 — 줄 시작 오프셋을 한 번만 만들고 이진탐색한다.
+    // (예전엔 토큰마다 slice+split 해서 파일 길이의 제곱으로 느려졌다. 20k줄 파일이 80초 걸렸다.)
+    lines.push(lineOfOffset(scanner.getTokenStart()));
     tok = scanner.scan();
   }
   return { tokens, lines };
@@ -721,8 +732,16 @@ function analyzeQuadraticLookups(ts, fileContents) {
     // 서브트리 안에서 선언된 이름 — 루프 안에서 만들어진 배열은 매 회 새로 만들어지므로 제외(오탐 방지)
     const declaredIn = (node) => {
       const names = new Set();
+      const addBinding = (name) => {
+        if (!name) return;
+        if (ts.isIdentifier(name)) { names.add(name.getText(sf)); return; }
+        // 구조분해도 지역 선언이다 — const { items } = row / const [a] = pair
+        if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+          for (const el of name.elements) if (ts.isBindingElement(el)) addBinding(el.name);
+        }
+      };
       const g = (n) => {
-        if ((ts.isVariableDeclaration(n) || ts.isParameter(n)) && ts.isIdentifier(n.name)) names.add(n.name.getText(sf));
+        if (ts.isVariableDeclaration(n) || ts.isParameter(n) || ts.isBindingElement(n)) addBinding(n.name);
         ts.forEachChild(n, g);
       };
       ts.forEachChild(node, g);
@@ -740,10 +759,21 @@ function analyzeQuadraticLookups(ts, fileContents) {
       if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
         const method = node.expression.name.getText(sf);
         const recvNode = node.expression.expression;
-        if (inLoop && ts.isIdentifier(recvNode) &&
+        // 수신자는 식별자뿐 아니라 프로퍼티 경로도 본다 — this.items / state.list 가
+        // NestJS·클래스 코드의 지배적 형태인데 예전엔 통째로 놓치고 있었다.
+        // 지역성은 경로의 '루트 식별자'로 판정한다(this는 지역이 아니므로 항상 통과).
+        const recvRoot = (e) => {
+          let c = e;
+          while (ts.isPropertyAccessExpression(c)) c = c.expression;
+          if (ts.isIdentifier(c)) return c.getText(sf);
+          return c.kind === ts.SyntaxKind.ThisKeyword ? "this" : null;
+        };
+        const recvIsPath = ts.isIdentifier(recvNode) || ts.isPropertyAccessExpression(recvNode);
+        const root = recvIsPath ? recvRoot(recvNode) : null;
+        if (inLoop && recvIsPath && root &&
             (QUADRATIC_METHODS.has(method) || QUADRATIC_GROUP_METHODS.has(method))) {
           const recv = recvNode.getText(sf);
-          if (!locals.has(recv)) {
+          if (!locals.has(root)) {
             sites.push({
               file, line: lineOf(node), recv, method,
               kind: QUADRATIC_GROUP_METHODS.has(method) ? "group" : "lookup",
@@ -846,6 +876,24 @@ function analyzeTextbookIssues(ts, fileContents) {
       ts.forEachChild(sf, collect);
     }
 
+    // 서브트리 안에서 선언된 모든 이름(구조분해 포함)
+    const declaredNamesIn = (node) => {
+      const names = new Set();
+      const addBinding = (name) => {
+        if (!name) return;
+        if (ts.isIdentifier(name)) { names.add(name.getText(sf)); return; }
+        if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+          for (const el of name.elements) if (ts.isBindingElement(el)) addBinding(el.name);
+        }
+      };
+      const g = (n) => {
+        if (ts.isVariableDeclaration(n) || ts.isParameter(n) || ts.isBindingElement(n)) addBinding(n.name);
+        ts.forEachChild(n, g);
+      };
+      ts.forEachChild(node, g);
+      return names;
+    };
+
     // 콜백 본문에 (중첩 함수 제외) await가 있나
     const hasDirectAwait = (fn) => {
       let found = false;
@@ -877,10 +925,9 @@ function analyzeTextbookIssues(ts, fileContents) {
       let childLoopVars = loopVars;
       if (isLoopNode(node)) {
         childInLoop = true; childInRealLoop = true;
-        if ((ts.isForOfStatement(node) || ts.isForInStatement(node)) && node.initializer &&
-            ts.isVariableDeclarationList(node.initializer) && ts.isIdentifier(node.initializer.declarations[0]?.name)) {
-          childLoopVars = new Set([...loopVars, node.initializer.declarations[0].name.getText(sf)]);
-        }
+        // 순회 변수뿐 아니라 루프 '본문에서 선언된 모든 이름'을 지역으로 본다.
+        // (루프 안에서 만든 정규식/배열은 매 회 새 객체라 상태가 샐 수 없다)
+        childLoopVars = new Set([...loopVars, ...declaredNamesIn(node)]);
       }
       if (isFnLike(node)) {
         childInAsyncFn = !!node.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword);
@@ -894,7 +941,9 @@ function analyzeTextbookIssues(ts, fileContents) {
       if (inLoop && ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
         const m = node.expression.name.getText(sf);
         const recv = node.expression.expression;
-        if (m === "test" && ts.isIdentifier(recv) && globalRegexVars.has(recv.getText(sf))) {
+        // 가드: 루프 안에서 만든 정규식은 매 회 새 객체라 lastIndex가 샐 수 없다 → 제외
+        if (m === "test" && ts.isIdentifier(recv) && globalRegexVars.has(recv.getText(sf)) &&
+            !loopVars.has(recv.getText(sf))) {
           statefulRegex.push({ file, line: lineOf(node), name: recv.getText(sf), method: m });
         }
       }
@@ -947,7 +996,7 @@ function analyzeTextbookIssues(ts, fileContents) {
 
         if (ITERATING_METHODS.has(method)) {
           // 순회 콜백은 "루프"지만 진짜 반복문은 아니다 — 모듈 로드 시 1회 도는 map()도 여기 해당.
-          for (const arg of node.arguments) if (isFnLike(arg)) walk(arg, true, inRealLoop, childInAsyncFn, childLoopVars);
+          for (const arg of node.arguments) if (isFnLike(arg)) walk(arg, true, inRealLoop, childInAsyncFn, new Set([...childLoopVars, ...declaredNamesIn(arg)]));
         }
       }
 
@@ -1162,7 +1211,7 @@ if (trackedSet) {
 const NON_SOURCE_RE = /(\.(test|spec|test-d|bench|benchmark|stories|e2e)\.[tj]sx?$)|(\/(__(tests?|mocks?|fixtures?|snapshots?)__|tests?|benchmarks?|__bench__|e2e|fixtures?|mocks?)\/)|(\.d\.ts$)/;
 {
   const before = files.length;
-  files = files.filter((f) => !NON_SOURCE_RE.test(f));
+  files = files.filter((f) => !NON_SOURCE_RE.test(f.replace(/\\/g, "/")));
   const dropped = before - files.length;
   if (dropped > 0) {
     console.log(`  비-프로덕션 파일(테스트·벤치·스토리·타입선언) ${dropped}개 제외 (${files.length}개 분석)\n`);
@@ -1175,7 +1224,7 @@ const NON_SOURCE_RE = /(\.(test|spec|test-d|bench|benchmark|stories|e2e)\.[tj]sx
 // 판정: 파일명 관례 또는 "한 줄이 비정상적으로 길다"(미니파이의 결정적 특징).
 {
   const isMinified = (p) => {
-    if (/\.(min|bundle)\.[cm]?js$/.test(p)) return true;
+    if (/\.(min|bundle)\.[cm]?js$/.test(p.replace(/\\/g, "/"))) return true;
     try {
       const text = fs.readFileSync(p, "utf-8");
       if (text.length < 500) return false;
@@ -1320,18 +1369,19 @@ if (ts && allFns.length > 0) {
   const over25Pct = (cogOver25.length / fnDenom) * 100;
   const longFileSeverityPct = (longFileSeverity / files.length) * 100;
   // io = 루프 안 파일읽기 + DB/HTTP N+1(순차 await). 파일당 비율.
-  const ioRate = files.length > 0 ? (io.uncachedLoopSites / files.length) * 100 : 0;
   // renderGates(렌더 인질)는 실측상 존경 OSS 17종서 0회 발동 = 변별력 없어 점수에서 제외.
   // (진단 출력·JSON엔 유지 — React 앱에서 참고용.)
   qualityScore = Math.max(0, Math.round(
     100
     - Math.min(15, Math.max(0, over15Pct - 2) * 2)  // cog15+ 함수비율 (2% 초과분만)
     - Math.min(12, Math.max(0, over25Pct - 1) * 3)  // cog25+ 함수비율 (1% 초과분만)
-    - Math.min(6, Math.max(0, Math.log2(Math.max(1, maxCog) / 15)) * 2.5) // 최악 함수: 로그, 1개 지배 방지
+    - Math.min(12, Math.max(0, Math.log2(Math.max(1, maxCog) / 15)) * 1.5) // 최악 함수: 로그(계수를 낮춰 100~800 구간이 갈리게 — 캡만 키우면 전부 만렙이라 변별력이 없다)
     - Math.min(16, Math.max(0, duplication.percent - 8) * 1.2) // 중복: 8% 초과분(구조적 반복 관용)
-    - Math.min(6, longFileSeverityPct * 1.0)        // 200줄+ 파일 심각도
-    - Math.min(9, Math.max(0, avgFileLines - 120) / 6) // 평균 파일 길이 120줄 초과분
-    - Math.min(24, ioRate * 0.35)                   // 루프 안 파일읽기 + DB/HTTP N+1: 파일당 비율
+    - Math.min(10, longFileSeverityPct * 1.0)       // 200줄+ 파일 심각도
+    - Math.min(12, Math.max(0, avgFileLines - 120) / 6) // 평균 파일 길이 120줄 초과분
+    // io(루프 IO·N+1)는 점수에서 뺐다: 재시도 루프·커서 페이지네이션처럼 '순차가 필수'인
+    // 코드를 구분하려면 사람 검증이 필요한데(PATTERNS.md), 사람이 필요한 축을 자동 채점에
+    // 넣으면 작은 저장소가 통째로 무너진다(파일 1개·사이트 2곳 = 만렙 감점). 진단으로만 보고한다.
   ));
 } else {
   // regex 폴백 (typescript 미설치)
@@ -1349,8 +1399,9 @@ if (wantDead) {
   dead = analyzeDeadCode(srcDir, new Set(files));
   if (dead) {
     const deadFilePct = files.length > 0 ? (dead.deadFiles / files.length) * 100 : 0;
-    const deadExportPct = allFns.length > 0 ? (dead.unusedExports / allFns.length) * 100 : 0;
-    const deadPenalty = Math.min(20, deadFilePct * 1.0) + Math.min(10, deadExportPct * 0.5);
+    // 파일당 미사용 export 수 — 예전엔 함수 수로 나눠 단위가 맞지 않았다(타입 위주 패키지에서 무의미)
+    const deadExportPct = files.length > 0 ? (dead.unusedExports / files.length) * 100 : 0;
+    const deadPenalty = Math.min(20, deadFilePct * 1.0) + Math.min(10, deadExportPct * 0.3);
     dead.filePct = Math.round(deadFilePct * 10) / 10;
     dead.exportPct = Math.round(deadExportPct * 10) / 10;
     dead.penalty = Math.round(deadPenalty * 10) / 10;
