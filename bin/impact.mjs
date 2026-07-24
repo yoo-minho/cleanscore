@@ -62,6 +62,15 @@ console.log(`\n  임팩트 점수: ${score} (머지 ${score}건)\n`);
 
 if (checkOnly) process.exit(0);
 
+// 상태를 하나라도 못 읽었으면(레이트리밋·네트워크) 파일을 쓰지 않는다.
+// 잘못된 'unknown'을 IMPACT.md·랜딩에 박아 로그를 오염시키는 것보다 그대로 두는 게 낫다.
+const unknown = rows.filter((r) => r.status === "unknown");
+if (unknown.length > 0) {
+  console.error(`  ⚠ ${unknown.length}건 상태 조회 실패 — 파일을 갱신하지 않습니다.`);
+  console.error("    비인증 GitHub API는 시간당 60회 제한입니다. GITHUB_TOKEN=$(gh auth token) 을 붙여 다시 실행하세요.\n");
+  process.exit(1);
+}
+
 // IMPACT.md 재생성
 const tableRows = rows
   .map((r) => {
