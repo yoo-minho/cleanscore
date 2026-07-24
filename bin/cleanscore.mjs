@@ -788,6 +788,8 @@ function analyzeTextbookIssues(ts, fileContents) {
   const spreadAccumulator = [];
   const regexInLoop = [];
   const floatingPromise = [];
+  const statefulRegex = [];
+  const forInArray = [];
 
   for (const { file, content } of fileContents) {
     const kind = /\.(tsx|jsx)$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
@@ -799,6 +801,30 @@ function analyzeTextbookIssues(ts, fileContents) {
       n.kind === ts.SyntaxKind.ForStatement || n.kind === ts.SyntaxKind.ForInStatement ||
       n.kind === ts.SyntaxKind.ForOfStatement || n.kind === ts.SyntaxKind.WhileStatement ||
       n.kind === ts.SyntaxKind.DoStatement;
+
+    // ── 전역 플래그 정규식 변수 수집: const RE = /x/g  (루프 밖 선언 = lastIndex 상태 공유)
+    const globalRegexVars = new Set();
+    // ── 배열로 "보이는" 변수 수집: 리터럴/map/filter/Array.from/split 로 만들어진 것만.
+    // for...in 은 객체에 쓰는 게 정상이므로, 배열이라는 증거가 있을 때만 잡는다.
+    const arrayVars = new Set();
+    {
+      const ARRAY_MAKERS = new Set(["map", "filter", "flatMap", "slice", "concat", "split", "from", "keys", "values"]);
+      const collect = (n) => {
+        if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer) {
+          const init = n.initializer;
+          if (ts.isRegularExpressionLiteral(init)) {
+            const text = init.getText(sf);
+            const flags = text.slice(text.lastIndexOf("/") + 1);
+            if (flags.includes("g") || flags.includes("y")) globalRegexVars.add(n.name.getText(sf));
+          }
+          if (ts.isArrayLiteralExpression(init)) arrayVars.add(n.name.getText(sf));
+          if (ts.isCallExpression(init) && ts.isPropertyAccessExpression(init.expression) &&
+              ARRAY_MAKERS.has(init.expression.name.getText(sf))) arrayVars.add(n.name.getText(sf));
+        }
+        ts.forEachChild(n, collect);
+      };
+      ts.forEachChild(sf, collect);
+    }
 
     // ── A) floating promise 준비: 이 파일에서 선언된 async 함수 이름 수집.
     // 로컬 선언만 본다 — 타입 정보 없이 "프라미스를 반환한다"를 확신할 수 있는 유일한 범위다.
@@ -858,6 +884,26 @@ function analyzeTextbookIssues(ts, fileContents) {
       }
       if (isFnLike(node)) {
         childInAsyncFn = !!node.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword);
+      }
+
+      // ── 전역 플래그 정규식을 루프 안에서 .test(): lastIndex가 문자열 사이로 새어
+      // 같은 입력도 호출마다 결과가 뒤바뀐다. 성능이 아니라 "조용히 틀린 답"을 내는 버그.
+      // 고침은 /g 제거 또는 매 회 새 정규식.
+      // 가드: .exec()는 제외한다 — `while ((m = re.exec(s)) !== null)` 은 /g 정규식의
+      // *정석 순회 관용구*이지 버그가 아니다(실제로 twenty에서 lastIndex=0 리셋까지 하고 있었다).
+      if (inLoop && ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+        const m = node.expression.name.getText(sf);
+        const recv = node.expression.expression;
+        if (m === "test" && ts.isIdentifier(recv) && globalRegexVars.has(recv.getText(sf))) {
+          statefulRegex.push({ file, line: lineOf(node), name: recv.getText(sf), method: m });
+        }
+      }
+
+      // ── 배열에 for...in: 인덱스가 문자열이고 상속 속성까지 돌며 순서 보장이 없다.
+      // 가드: 배열이라는 증거(리터럴·map·filter·split 등)가 있는 변수만.
+      if (ts.isForInStatement(node) && ts.isIdentifier(node.expression) &&
+          arrayVars.has(node.expression.getText(sf))) {
+        forInArray.push({ file, line: lineOf(node), name: node.expression.getText(sf) });
       }
 
       // ── A) floating promise: async 함수 안에서, 결과를 버리는 문(ExpressionStatement)으로
@@ -930,6 +976,8 @@ function analyzeTextbookIssues(ts, fileContents) {
     spreadAccumulator: { count: spreadAccumulator.length, worst: spreadAccumulator.slice(0, 6) },
     regexInLoop: { count: regexInLoop.length, worst: regexInLoop.slice(0, 6) },
     floatingPromise: { count: floatingPromise.length, worst: floatingPromise.slice(0, 6) },
+    statefulRegex: { count: statefulRegex.length, worst: statefulRegex.slice(0, 6) },
+    forInArray: { count: forInArray.length, worst: forInArray.slice(0, 6) },
   };
 }
 
@@ -1118,6 +1166,32 @@ const NON_SOURCE_RE = /(\.(test|spec|test-d|bench|benchmark|stories|e2e)\.[tj]sx
   const dropped = before - files.length;
   if (dropped > 0) {
     console.log(`  비-프로덕션 파일(테스트·벤치·스토리·타입선언) ${dropped}개 제외 (${files.length}개 분석)\n`);
+  }
+}
+
+// 미니파이·번들 파일 제외: 저장소에 커밋된 벤더 번들·시드 에셋은 git 추적 대상이라
+// 지금까지의 필터를 전부 통과하지만, 사람이 쓴 코드가 아니라 모든 축을 오염시킨다.
+// (실제 사례: 시드 프로젝트의 번들 index.mjs 하나가 for...in 오탐 100곳 이상을 만들었다)
+// 판정: 파일명 관례 또는 "한 줄이 비정상적으로 길다"(미니파이의 결정적 특징).
+{
+  const isMinified = (p) => {
+    if (/\.(min|bundle)\.[cm]?js$/.test(p)) return true;
+    try {
+      const text = fs.readFileSync(p, "utf-8");
+      if (text.length < 500) return false;
+      const lines = text.split("\n");
+      const longest = lines.reduce((m, l) => (l.length > m ? l.length : m), 0);
+      const avg = text.length / lines.length;
+      return longest > 2000 || avg > 200;
+    } catch {
+      return false;
+    }
+  };
+  const before = files.length;
+  files = files.filter((f) => !isMinified(f));
+  const dropped = before - files.length;
+  if (dropped > 0) {
+    console.log(`  미니파이·번들 파일 ${dropped}개 제외 — 사람이 쓴 코드가 아님 (${files.length}개 분석)\n`);
   }
 }
 
@@ -1421,6 +1495,14 @@ if (textbook) {
   if (t.spreadAccumulator.count > 0) {
     console.log(`  스프레드 누적: ${t.spreadAccumulator.count}곳 — acc = [...acc, x] 는 매 회 전체 복사 O(n²) (push/직접 대입)`);
     for (const w of t.spreadAccumulator.worst) console.log(`    (${w.where}) ${w.file}:${w.line}`);
+  }
+  if (t.statefulRegex.count > 0) {
+    console.log(`  ⚠ 전역 정규식 상태: ${t.statefulRegex.count}곳 — /g 정규식을 루프에서 .test() 하면 lastIndex가 문자열 사이로 새어 결과가 번갈아 틀립니다`);
+    for (const w of t.statefulRegex.worst) console.log(`    ${w.name}.${w.method}() — ${w.file}:${w.line}`);
+  }
+  if (t.forInArray.count > 0) {
+    console.log(`  ⚠ 배열에 for...in: ${t.forInArray.count}곳 — 인덱스가 문자열이고 상속 속성까지 돕니다 (for...of 권장)`);
+    for (const w of t.forInArray.worst) console.log(`    ${w.name} — ${w.file}:${w.line}`);
   }
   if (t.floatingPromise.count > 0) {
     console.log(`  ⚠ floating promise: ${t.floatingPromise.count}곳 — async 함수를 await 없이 호출하고 결과를 버립니다 (기다리지 않는 버그)`);
