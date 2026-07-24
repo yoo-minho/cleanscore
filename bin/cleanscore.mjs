@@ -447,8 +447,17 @@ function analyzeDuplication(ts, fileContents) {
         for (let c = 0; c < s.length; c++) h = ((h * 33) ^ s.charCodeAt(c)) >>> 0;
       }
       const arr = seen.get(h);
-      if (arr) arr.push({ fi, idx: i });
-      else seen.set(h, [{ fi, idx: i }]);
+      if (arr) {
+        // 해시 충돌 방어: 같은 해시라도 실제 토큰열이 같은지 확인(32비트 djb2는 대형 repo에서
+        // 생일역설로 가짜 중복을 만들 수 있다). 첫 항목과 토큰 단위로 대조한다.
+        const ref = arr[0];
+        let same = true;
+        for (let k = 0; k < DUP_WINDOW; k++) {
+          if (perFile[ref.fi].tokens[ref.idx + k] !== f.tokens[i + k]) { same = false; break; }
+        }
+        if (same) arr.push({ fi, idx: i });
+        else { const key = h + ":" + i; seen.set(key, [{ fi, idx: i }]); }
+      } else seen.set(h, [{ fi, idx: i }]);
     }
   });
 
@@ -819,6 +828,8 @@ function analyzeTextbookIssues(ts, fileContents) {
   const regexInLoop = [];
   const floatingPromise = [];
   const loopInvariantIndex = [];
+  const sharedRefFill = [];
+  const numericSortNoComparator = [];
   const statefulRegex = [];
   const forInArray = [];
 
@@ -971,6 +982,40 @@ function analyzeTextbookIssues(ts, fileContents) {
         }
       }
 
+      // ── Array(n).fill([]) / .fill({}) : 참조 하나를 모든 칸이 공유한다.
+      // arr[0].push(x) 하면 모든 칸이 바뀐다 — 조용히 틀린 답. 고침은 Array.from({length:n}, () => []).
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
+          node.expression.name.getText(sf) === "fill" && node.arguments.length >= 1 &&
+          // 수신자가 '배열을 만드는 표현'일 때만 — Array.prototype.fill 이 아닌 도메인 API의 .fill()
+          // (Playwright의 page.fill(selector, {..}) 처럼)을 오탐하지 않는다.
+          (() => {
+            const r = node.expression.expression;
+            if (ts.isNewExpression(r) && ts.isIdentifier(r.expression) && r.expression.getText(sf) === "Array") return true;
+            if (ts.isCallExpression(r) && ts.isIdentifier(r.expression) && r.expression.getText(sf) === "Array") return true;
+            if (ts.isArrayLiteralExpression(r)) return true;
+            // Array(n) / new Array(n) 를 담은 변수까지는 정적으로 확신 못 하므로 위 세 형태만.
+            return false;
+          })()) {
+        const a0 = node.arguments[0];
+        if (ts.isArrayLiteralExpression(a0) || ts.isObjectLiteralExpression(a0) ||
+            (ts.isNewExpression(a0) && ts.isIdentifier(a0.expression) && ["Array","Set","Map"].includes(a0.expression.getText(sf)))) {
+          sharedRefFill.push({ file, line: lineOf(node), what: a0.getText(sf).slice(0, 20) });
+        }
+      }
+
+      // ── 숫자 배열을 .sort() 비교자 없이: 문자열 사전순 정렬이라 [10,2,1] -> [1,10,2].
+      // 배열이 숫자라는 증거(요소가 전부 숫자 리터럴, 또는 .length/.map(Number) 흔적)가 있을 때만.
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
+          node.expression.name.getText(sf) === "sort" && node.arguments.length === 0) {
+        const recv = node.expression.expression;
+        // 수신자가 숫자 배열 리터럴이거나, 방금 만든 숫자 배열일 때만 (오탐 최소화)
+        if (ts.isArrayLiteralExpression(recv) && recv.elements.length > 0 &&
+            recv.elements.every((e) => ts.isNumericLiteral(e) ||
+              (ts.isPrefixUnaryExpression(e) && ts.isNumericLiteral(e.operand)))) {
+          numericSortNoComparator.push({ file, line: lineOf(node) });
+        }
+      }
+
       // ── 전역 플래그 정규식을 루프 안에서 .test(): lastIndex가 문자열 사이로 새어
       // 같은 입력도 호출마다 결과가 뒤바뀐다. 성능이 아니라 "조용히 틀린 답"을 내는 버그.
       // 고침은 /g 제거 또는 매 회 새 정규식.
@@ -1064,6 +1109,8 @@ function analyzeTextbookIssues(ts, fileContents) {
     regexInLoop: { count: regexInLoop.length, worst: regexInLoop.slice(0, 6) },
     floatingPromise: { count: floatingPromise.length, worst: floatingPromise.slice(0, 6) },
     loopInvariantIndex: { count: loopInvariantIndex.length, worst: loopInvariantIndex.slice(0, 6) },
+    sharedRefFill: { count: sharedRefFill.length, worst: sharedRefFill.slice(0, 6) },
+    numericSortNoComparator: { count: numericSortNoComparator.length, worst: numericSortNoComparator.slice(0, 6) },
     statefulRegex: { count: statefulRegex.length, worst: statefulRegex.slice(0, 6) },
     forInArray: { count: forInArray.length, worst: forInArray.slice(0, 6) },
   };
@@ -1431,6 +1478,8 @@ if (ts && allFns.length > 0) {
   ));
 } else {
   // regex 폴백 (typescript 미설치)
+  console.error("  ⚠ typescript를 찾지 못해 regex 근사 모드로 채점합니다 — AST 모드와 점수 체계가 다릅니다.");
+  console.error("    정확한 점수를 원하면 대상 또는 이 도구에 typescript를 설치하세요.\n");
   qualityScore = Math.max(0, Math.round(
     100
     - Math.min(40, Math.max(0, branchDensity - 10) * 2)
@@ -1600,6 +1649,14 @@ if (textbook) {
   if (t.forInArray.count > 0) {
     console.log(`  ⚠ 배열에 for...in: ${t.forInArray.count}곳 — 인덱스가 문자열이고 상속 속성까지 돕니다 (for...of 권장)`);
     for (const w of t.forInArray.worst) console.log(`    ${w.name} — ${w.file}:${w.line}`);
+  }
+  if (t.sharedRefFill.count > 0) {
+    console.log(`  ⚠ 공유 참조 fill: ${t.sharedRefFill.count}곳 — Array(n).fill([]/{}) 는 참조 하나를 모든 칸이 공유합니다 (한 칸 수정 = 전부 수정, 조용한 버그)`);
+    for (const w of t.sharedRefFill.worst) console.log(`    .fill(${w.what}) — ${w.file}:${w.line}`);
+  }
+  if (t.numericSortNoComparator.count > 0) {
+    console.log(`  ⚠ 숫자 정렬 버그: ${t.numericSortNoComparator.count}곳 — 숫자 배열을 sort() 비교자 없이 = 사전순 ([10,2,1]→[1,10,2])`);
+    for (const w of t.numericSortNoComparator.worst) console.log(`    .sort() — ${w.file}:${w.line}`);
   }
   if (t.loopInvariantIndex.count > 0) {
     console.log(`  루프 안 인덱스 재구축: ${t.loopInvariantIndex.count}곳 — 루프 밖 값으로 new Set/Map을 매 회 다시 만듭니다 O(n·m) (루프 밖으로 호이스팅)`);
