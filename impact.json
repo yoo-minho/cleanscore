@@ -34,6 +34,13 @@
       "repo": "twentyhq/twenty",
       "repoLabel": "twenty · 37k★",
       "pr": 23232
+    },
+    {
+      "title": "lucky-user set rebuild in loop",
+      "type": "루프 불변 인덱스 재구축 (while마다 new Set 재구축 → 호이스팅)",
+      "repo": "calcom/cal.diy",
+      "repoLabel": "cal.com · 47k★",
+      "pr": 29832
     }
   ]
 }

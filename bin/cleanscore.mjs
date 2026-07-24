@@ -818,6 +818,7 @@ function analyzeTextbookIssues(ts, fileContents) {
   const spreadAccumulator = [];
   const regexInLoop = [];
   const floatingPromise = [];
+  const loopInvariantIndex = [];
   const statefulRegex = [];
   const forInArray = [];
 
@@ -933,6 +934,43 @@ function analyzeTextbookIssues(ts, fileContents) {
         childInAsyncFn = !!node.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword);
       }
 
+      // ── 루프 불변 인덱스 재구축: 루프 안에서 new Set(xs)/new Map(xs.map(...)) 를 만드는데
+      // 인자의 소스가 루프 밖 값이면 매 회 같은 인덱스를 다시 짓는다 = O(n·m). "고친 척하는 O(n²)".
+      // 고침은 생성자를 루프 밖으로 호이스팅. 기계적이고 검증 가능(T2).
+      if (inRealLoop && ts.isNewExpression(node) && ts.isIdentifier(node.expression) &&
+          (node.expression.getText(sf) === "Set" || node.expression.getText(sf) === "Map") &&
+          // 가드: new Set(x).add(y) / new Map(x).set(k,v) 는 '수정한 파생 복사본'이다.
+          // 매 회 다른 값을 만드는 것이므로 호이스팅하면 동작이 깨진다(재귀에 넘기는 불변 스냅샷 등).
+          !(ts.isPropertyAccessExpression(node.parent) &&
+            ["add", "set", "delete"].includes(node.parent.name.getText(sf)))) {
+        const arg = node.arguments && node.arguments[0];
+        // 인자에서 참조하는 루트 식별자들을 모은다
+        const roots = new Set();
+        let usesLoopVar = false;
+        // 인자 안의 콜백(map/filter…)이 자체 선언한 이름은 '루프 변수'가 아니다 → 그 이름들을 빼고 본다.
+        const innerDecls = declaredNamesIn(arg);
+        const collect = (n) => {
+          if (ts.isFunctionExpression(n) || ts.isArrowFunction(n)) {
+            for (const p of n.parameters) if (ts.isIdentifier(p.name)) innerDecls.add(p.name.getText(sf));
+          }
+          if (ts.isIdentifier(n)) {
+            const nm = n.getText(sf);
+            if (innerDecls.has(nm)) { /* 콜백 지역 변수 — 무시 */ }
+            else if (loopVars.has(nm)) usesLoopVar = true;
+            else roots.add(nm);
+          }
+          ts.forEachChild(n, collect);
+        };
+        if (arg) collect(arg);
+        // 가드: (a) 인자가 루프 변수를 참조하면 루프마다 값이 달라 호이스팅 불가 → 제외
+        //       (b) 소스 루트가 하나라도 루프 밖(loopVars 아님)이어야 '불변'이다
+        const hasOuterSource = [...roots].length > 0;
+        if (!usesLoopVar && hasOuterSource) {
+          const src = [...roots][0];
+          loopInvariantIndex.push({ file, line: lineOf(node), ctor: node.expression.getText(sf), src });
+        }
+      }
+
       // ── 전역 플래그 정규식을 루프 안에서 .test(): lastIndex가 문자열 사이로 새어
       // 같은 입력도 호출마다 결과가 뒤바뀐다. 성능이 아니라 "조용히 틀린 답"을 내는 버그.
       // 고침은 /g 제거 또는 매 회 새 정규식.
@@ -1025,6 +1063,7 @@ function analyzeTextbookIssues(ts, fileContents) {
     spreadAccumulator: { count: spreadAccumulator.length, worst: spreadAccumulator.slice(0, 6) },
     regexInLoop: { count: regexInLoop.length, worst: regexInLoop.slice(0, 6) },
     floatingPromise: { count: floatingPromise.length, worst: floatingPromise.slice(0, 6) },
+    loopInvariantIndex: { count: loopInvariantIndex.length, worst: loopInvariantIndex.slice(0, 6) },
     statefulRegex: { count: statefulRegex.length, worst: statefulRegex.slice(0, 6) },
     forInArray: { count: forInArray.length, worst: forInArray.slice(0, 6) },
   };
@@ -1561,6 +1600,10 @@ if (textbook) {
   if (t.forInArray.count > 0) {
     console.log(`  ⚠ 배열에 for...in: ${t.forInArray.count}곳 — 인덱스가 문자열이고 상속 속성까지 돕니다 (for...of 권장)`);
     for (const w of t.forInArray.worst) console.log(`    ${w.name} — ${w.file}:${w.line}`);
+  }
+  if (t.loopInvariantIndex.count > 0) {
+    console.log(`  루프 안 인덱스 재구축: ${t.loopInvariantIndex.count}곳 — 루프 밖 값으로 new Set/Map을 매 회 다시 만듭니다 O(n·m) (루프 밖으로 호이스팅)`);
+    for (const w of t.loopInvariantIndex.worst) console.log(`    new ${w.ctor}(${w.src}…) — ${w.file}:${w.line}`);
   }
   if (t.floatingPromise.count > 0) {
     console.log(`  ⚠ floating promise: ${t.floatingPromise.count}곳 — async 함수를 await 없이 호출하고 결과를 버립니다 (기다리지 않는 버그)`);
