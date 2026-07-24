@@ -13,6 +13,13 @@
       "repo": "novuhq/novu",
       "repoLabel": "novu · 40k★",
       "pr": 12074
+    },
+    {
+      "title": "booking member diff O(n²)",
+      "type": "O(n²) 배열 조회 (루프 안 .some() 선형스캔 4회 → Set)",
+      "repo": "calcom/cal.diy",
+      "repoLabel": "cal.com · 46729★",
+      "pr": 29828
     }
   ]
 }
