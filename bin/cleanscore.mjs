@@ -696,6 +696,80 @@ function analyzeIoDensity(ts, fileContents) {
 // 게이트에 걸린 요소가 그 데이터에 실제로 의존하는 비율로 판정한다.
 const HOSTAGE_DEP_RATIO = 0.5; // 프롭 절반도 안 쓰면서 전체를 막고 있으면 인질
 
+// O(n²) 배열 조회 — 루프 안에서 "루프 밖에 선언된 배열"에 선형 탐색(find/findIndex/some)을 돌리는 자리.
+// 루프 n번 × 탐색 m번 = O(n·m). Map/Set을 한 번 만들어 쓰면 O(n+m)이 되는 기계적 개선이라
+// 취향이 개입하지 않는다(복잡도·중복과 달리 정답이 하나) — 그래서 외부 기여(PR)로도 안전한 축.
+// find/findIndex/some만 본다: 배열 전용 메서드라 문자열(str.includes) 오탐이 원천 차단된다.
+const QUADRATIC_METHODS = new Set(["find", "findIndex", "some"]);
+
+function analyzeQuadraticLookups(ts, fileContents) {
+  const sites = [];
+  for (const { file, content } of fileContents) {
+    const kind = /\.(tsx|jsx)$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+    const sf = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true, kind);
+    const lineOf = (n) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
+    const isFnLike = (n) =>
+      ts.isFunctionDeclaration(n) || ts.isFunctionExpression(n) || ts.isArrowFunction(n) || ts.isMethodDeclaration(n);
+    const isLoopNode = (n) =>
+      n.kind === ts.SyntaxKind.ForStatement || n.kind === ts.SyntaxKind.ForInStatement ||
+      n.kind === ts.SyntaxKind.ForOfStatement || n.kind === ts.SyntaxKind.WhileStatement ||
+      n.kind === ts.SyntaxKind.DoStatement;
+
+    // 서브트리 안에서 선언된 이름 — 루프 안에서 만들어진 배열은 매 회 새로 만들어지므로 제외(오탐 방지)
+    const declaredIn = (node) => {
+      const names = new Set();
+      const g = (n) => {
+        if ((ts.isVariableDeclaration(n) || ts.isParameter(n)) && ts.isIdentifier(n.name)) names.add(n.name.getText(sf));
+        ts.forEachChild(n, g);
+      };
+      ts.forEachChild(node, g);
+      return names;
+    };
+
+    const walk = (node, inLoop, locals) => {
+      let childInLoop = inLoop;
+      let childLocals = locals;
+      if (isLoopNode(node)) {
+        childInLoop = true;
+        childLocals = new Set([...locals, ...declaredIn(node)]);
+      }
+
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+        const method = node.expression.name.getText(sf);
+        const recvNode = node.expression.expression;
+        if (inLoop && QUADRATIC_METHODS.has(method) && ts.isIdentifier(recvNode)) {
+          const recv = recvNode.getText(sf);
+          if (!locals.has(recv)) sites.push({ file, line: lineOf(node), recv, method });
+        }
+        // 순회 메서드(map/forEach…)에 넘긴 콜백 본문도 루프로 취급
+        if (ITERATING_METHODS.has(method)) {
+          for (const arg of node.arguments) {
+            if (isFnLike(arg)) walk(arg, true, new Set([...childLocals, ...declaredIn(arg)]));
+          }
+        }
+      }
+
+      ts.forEachChild(node, (child) => {
+        const alreadyWalked =
+          ts.isCallExpression(node) &&
+          ts.isPropertyAccessExpression(node.expression) &&
+          ITERATING_METHODS.has(node.expression.name.getText(sf)) &&
+          isFnLike(child);
+        if (!alreadyWalked) walk(child, childInLoop, childLocals);
+      });
+    };
+    ts.forEachChild(sf, (n) => walk(n, false, new Set()));
+  }
+
+  const byFile = new Map();
+  for (const s of sites) byFile.set(s.file, (byFile.get(s.file) || 0) + 1);
+  return {
+    sites: sites.length,
+    worst: sites.slice(0, 8),
+    files: [...byFile.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([file, n]) => ({ file, n })),
+  };
+}
+
 function analyzeRenderGates(ts, fileContents) {
   const findings = [];
 
@@ -966,6 +1040,7 @@ let cognitive = null;
 let duplication = null;
 let io = null;
 let renderGates = null;
+let quadratic = null;
 if (ts && allFns.length > 0) {
   const byCc = [...allFns].sort((a, b) => b.cc - a.cc);
   cc = {
@@ -994,6 +1069,7 @@ if (ts && allFns.length > 0) {
   duplication = analyzeDuplication(ts, fileContents);
   io = analyzeIoDensity(ts, fileContents);
   renderGates = analyzeRenderGates(ts, fileContents);
+  quadratic = analyzeQuadraticLookups(ts, fileContents);
 
   // v4 보정: 존경받는 OSS 코퍼스(ky·execa·zod·hono·vite·zustand 등 14종) 분포로 역피팅.
   // 원칙: 건강한 코드베이스도 함수 몇%는 cog15+·중복 약간은 정상 → free 임계 이하 감점 0,
@@ -1096,6 +1172,7 @@ const stats = {
     cognitive,            // {avg, p90, max, over15, over25, worst[5]} — 중첩 가중 복잡도
     duplication,          // {percent, blocks, worstFiles, worstBlocks} — 토큰 중복 밀도
     io,                   // {readers, uncachedReaders, loopSites, uncachedLoopSites, worst} — 루프 안 파일 읽기
+    quadratic,            // {sites, worst[], files[]} — 루프 안 O(n²) 배열 조회(진단 전용, 점수 미반영)
     renderGates,          // {hostages, worst} — fetch 하나가 무관한 UI까지 막고 있는 자리
     cc,                   // {functions, avg, p90, max, over10, over20, worst[5]} — McCabe (참고용)
     branchDensity,        // 100줄당 분기 수 (regex 근사, 참고용)
@@ -1168,6 +1245,12 @@ if (cc) {
   }
 } else {
   console.log(`  청결도: ${qualityGrade} (${qualityScore}점) — 분기밀도 ${branchDensity}/100줄, 평균 ${avgFileLines}줄/파일, 200줄+ ${longFiles}개 (regex 폴백 — typescript 설치 시 AST 정밀 분석)`);
+}
+if (quadratic && quadratic.sites > 0) {
+  console.log(`  O(n²) 배열 조회: ${quadratic.sites}곳 — 루프 안에서 루프 밖 배열을 선형 탐색합니다 (Map/Set으로 O(n), 점수 미반영)`);
+  for (const w of quadratic.worst.slice(0, 5)) {
+    console.log(`    ${w.recv}.${w.method}() — ${w.file}:${w.line}`);
+  }
 }
 if (dead) {
   console.log(`  데드코드: 죽은 파일 ${dead.deadFiles}개(${dead.filePct}%)·미사용 export ${dead.unusedExports}개(${dead.exportPct}%) → 감점 −${dead.penalty}${dead.keptFiles > 0 ? ` · @keep 제외 ${dead.keptFiles}개` : ""}`);
